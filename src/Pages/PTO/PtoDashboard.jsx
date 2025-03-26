@@ -1,40 +1,39 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { styled, useTheme } from '@mui/material/styles';
-import Box from '@mui/material/Box';
+import { 
+  Box,
+  CssBaseline,
+  Typography,
+  Divider,
+  IconButton,
+  Tooltip,
+  Paper,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar
+} from '@mui/material';
 import MuiDrawer from '@mui/material/Drawer';
 import MuiAppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import List from '@mui/material/List';
-import CssBaseline from '@mui/material/CssBaseline';
-import Typography from '@mui/material/Typography';
-import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import MenuIcon from '@mui/icons-material/Menu';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import InboxIcon from '@mui/icons-material/MoveToInbox';
-import MailIcon from '@mui/icons-material/Mail';
-import { Paper, Tooltip } from '@mui/material';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
-
-// icons 
-import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
-import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
-import QueueOutlinedIcon from '@mui/icons-material/QueueOutlined';
-import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
-
-
-import ManageDrives from '../CommonPages/ManageDrives'
-import StudentList from '../CommonPages/Students';
-import Info from './Pages/Info';
+import { 
+  Menu as MenuIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  PowerSettingsNew as PowerSettingsNewIcon,
+  PeopleAltOutlined as PeopleAltOutlinedIcon,
+  QueueOutlined as QueueOutlinedIcon,
+  ManageAccountsOutlined as ManageAccountsOutlinedIcon
+} from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { useEffect } from 'react';
+
+// Components
+import ManageDrives from '../CommonPages/ManageDrives';
+import StudentList from '../CommonPages/Students';
+import Info from './Pages/Info';
 
 const drawerWidth = 240;
 
@@ -45,6 +44,8 @@ const openedMixin = (theme) => ({
     duration: theme.transitions.duration.enteringScreen,
   }),
   overflowX: 'hidden',
+  backgroundColor: '#5c6bc0',
+  color: 'white',
 });
 
 const closedMixin = (theme) => ({
@@ -57,6 +58,8 @@ const closedMixin = (theme) => ({
   [theme.breakpoints.up('sm')]: {
     width: `calc(${theme.spacing(8)} + 1px)`,
   },
+  backgroundColor: '#5c6bc0',
+  color: 'white',
 });
 
 const DrawerHeader = styled('div')(({ theme }) => ({
@@ -64,7 +67,6 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   alignItems: 'center',
   justifyContent: 'flex-end',
   padding: theme.spacing(0, 1),
-  // necessary for content to be below app bar
   ...theme.mixins.toolbar,
 }));
 
@@ -76,6 +78,8 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
+  backgroundColor: '#5c6bc0',
+  color: 'white',
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -86,77 +90,91 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
-  ({ theme, open }) => ({
-    width: drawerWidth,
-    flexShrink: 0,
-    whiteSpace: 'nowrap',
-    boxSizing: 'border-box',
-    ...(open && {
-      ...openedMixin(theme),
-      '& .MuiDrawer-paper': openedMixin(theme),
-    }),
-    ...(!open && {
-      ...closedMixin(theme),
-      '& .MuiDrawer-paper': closedMixin(theme),
-    }),
+const Drawer = styled(MuiDrawer, { 
+  shouldForwardProp: (prop) => prop !== 'open' 
+})(({ theme, open }) => ({
+  width: drawerWidth,
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
+  ...(open && {
+    ...openedMixin(theme),
+    '& .MuiDrawer-paper': openedMixin(theme),
   }),
-);
+  ...(!open && {
+    ...closedMixin(theme),
+    '& .MuiDrawer-paper': closedMixin(theme),
+  }),
+}));
 
 export default function PtoDashboard() {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [activeComponent, setActiveComponent] = useState('ManageDrives');
+  const [user, setUser] = useState({});
+  const userUID = sessionStorage.getItem("uid");
 
-    //navigate 
-    const navigate = useNavigate();
+  const handleDrawerOpen = () => setOpen(true);
+  const handleDrawerClose = () => setOpen(false);
 
-    const singOut = () =>{
-      sessionStorage.clear()
-      navigate('/')
-    }
+  const signOut = () => {
+    sessionStorage.clear();
+    navigate('/');
+  };
 
-    // fatch data
-    const [user,setUser] = useState({})
-    console.log(user)
-    const userUID = sessionStorage.getItem("uid")
-    console.log(userUID);
-  
-    const fatchData = async () => {
+  const fetchUserData = async () => {
+    try {
       const docRef = doc(db, "users", userUID);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        const userData = docSnap.data();
-        setUser(userData) 
-        
+        setUser(docSnap.data());
       } else {
-        // doc.data() will be undefined in this case
-        console.log("No such document!");
+        console.log("No user document found");
       }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
     }
-  
-    useEffect(()=>{
-      fatchData()
-    },[])
-
-
-  const theme = useTheme();
-  const [open, setOpen] = useState(false);
-
-  const handleDrawerOpen = () => {
-    setOpen(true);
   };
 
-  const handleDrawerClose = () => {
-    setOpen(false);
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const menuItems = [
+    { 
+      name: 'Manage Drives', 
+      icon: <QueueOutlinedIcon />,
+      component: 'ManageDrives'
+    },
+    { 
+      name: 'Students', 
+      icon: <PeopleAltOutlinedIcon />,
+      component: 'StudentList'
+    },
+    { 
+      name: 'Profile', 
+      icon: <ManageAccountsOutlinedIcon />,
+      component: 'Info'
+    }
+  ];
+
+  const renderComponent = () => {
+    switch(activeComponent) {
+      case 'ManageDrives': return <ManageDrives />;
+      case 'StudentList': return <StudentList />;
+      case 'Info': return <Info user={user} />;
+      default: return <ManageDrives />;
+    }
   };
-
-
-  const [component, setComponent] = useState('ManageDrives')
-
 
   return (
-    <Box sx={{ display: 'flex' ,color:'#555555'}}>
+    <Box sx={{ display: 'flex', bgcolor: '#f5f5f5', minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar position="fixed" open={open} sx={{backgroundColor:'#D9E4DD',color:'#555555'}}>
+      
+      {/* App Bar */}
+      <AppBar position="fixed" open={open}>
         <Toolbar>
           <IconButton
             color="inherit"
@@ -171,125 +189,92 @@ export default function PtoDashboard() {
             <MenuIcon />
           </IconButton>
 
-          <Box sx={{display: 'flex', flexDirection: 'row', justifyContent: 'space-between' , alignItems: 'center' , width:'100%'}}> 
-
-
-          <Typography variant="h6" noWrap component="div">
-            PTO
-          </Typography>
-          <Tooltip title="Logout">
-            <IconButton onClick={singOut}>
-              <PowerSettingsNewIcon  sx={{color:'#555555'}}/>
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            width: '100%' 
+          }}>
+            <Typography variant="h6" noWrap component="div">
+              Placement Training Office
+            </Typography>
+            <Tooltip title="Logout">
+              <IconButton onClick={signOut} color="inherit">
+                <PowerSettingsNewIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
-
-
         </Toolbar>
       </AppBar>
 
-
+      {/* Sidebar Drawer */}
       <Drawer variant="permanent" open={open}>
         <DrawerHeader>
-          <IconButton onClick={handleDrawerClose}>
+          <IconButton onClick={handleDrawerClose} sx={{ color: 'white' }}>
             {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
         </DrawerHeader>
-        <Divider />
+        <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.3)' }} />
 
         <List>
-
-
-          {/* mnanageDrives info */}
-          <ListItem>
-          <ListItemButton
+          {menuItems.map((item) => (
+            <ListItem key={item.name} disablePadding sx={{ display: 'block' }}>
+              <ListItemButton
                 sx={{
                   minHeight: 48,
                   justifyContent: open ? 'initial' : 'center',
                   px: 2.5,
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)'
+                  }
                 }}
-                button onClick={() => setComponent('ManageDrives')}
+                onClick={() => setActiveComponent(item.component)}
               >
-                
                 <ListItemIcon
                   sx={{
                     minWidth: 0,
                     mr: open ? 3 : 'auto',
                     justifyContent: 'center',
+                    color: 'white'
                   }}
                 >
-                  {/* drive icon */}
-                  <QueueOutlinedIcon/>
+                  {item.icon}
                 </ListItemIcon>
-                <ListItemText primary='Manage Drives' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
-          </ListItem>
-
-          {/* students list  info */}
-          <ListItem>
-          <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-                button onClick={() => setComponent('StudentList')}
-              >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* drive icon */}
-                  <PeopleAltOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='Students' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
-          </ListItem>
-          
-          <Divider />
-
-          {/* info list  info */}
-          <ListItem>
-          <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-                button onClick={() => setComponent('Info')}
-              >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* drive icon */}
-                  <ManageAccountsOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='Profile' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
-          </ListItem>
-
-
+                <ListItemText 
+                  primary={item.name} 
+                  sx={{ 
+                    opacity: open ? 1 : 0,
+                    color: 'white'
+                  }} 
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
         </List>
-        <Divider />
-
-
-
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <DrawerHeader />
 
-        {
-          component === 'ManageDrives' ? <ManageDrives />  : component === 'StudentList' ? <StudentList />  : component === 'Info' ? <Info user={{...user}}/>  : ""
-        }
+      {/* Main Content */}
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          p: 3,
+          bgcolor: 'background.default',
+          minHeight: '100vh'
+        }}
+      >
+        <DrawerHeader />
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 3,
+            borderRadius: 2,
+            minHeight: '80vh',
+            bgcolor: 'background.paper'
+          }}
+        >
+          {renderComponent()}
+        </Paper>
       </Box>
     </Box>
   );

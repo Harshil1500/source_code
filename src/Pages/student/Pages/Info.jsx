@@ -1,190 +1,202 @@
-import { Box, Button, CssBaseline, Divider, Grid, Paper, TextField, Typography } from "@mui/material";
-import { Container } from "@mui/system";
+import { 
+  Box, 
+  Button, 
+  CircularProgress,
+  Container,
+  Divider, 
+  Grid, 
+  Paper, 
+  TextField, 
+  Typography 
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 
 // Firebase
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../firebase";
 
-// Toastify
-import { ToastContainer, toast } from "material-react-toastify";
-import "material-react-toastify/dist/ReactToastify.css";
+// Toast notifications
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-const Info = (props) => {
-  // Toastify Notifications
-  const notifySuccess = () => toast.success("Check your mail for reset password...");
-  const notifyUpdate = () => toast.success("Profile updated...");
-  const notifyError = (errorMessage) => toast.error(errorMessage);
+// Styled Components
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(4),
+  borderRadius: theme.spacing(2),
+  boxShadow: "0px 10px 30px rgba(92, 107, 192, 0.2)",
+  background: "rgba(255, 255, 255, 0.95)",
+  marginBottom: theme.spacing(3),
+  border: "1px solid rgba(92, 107, 192, 0.1)"
+}));
 
-  const uid = sessionStorage.getItem("uid");
+const Info = ({ user }) => { // Removed setUser from props
+  const [data, setData] = useState({ ...user });
+  const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
 
-  // User info state
-  const [data, setData] = useState({ ...props.user });
+  // Show notification function
+  const showNotification = (message, type = "success") => {
+    toast[type](message, {
+      position: "top-center",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      style: {
+        background: type === "success" ? "#5c6bc0" : "#f44336",
+        color: "#fff"
+      }
+    });
+  };
 
-  // Fetch user data from Firestore
+  // Fetch user data
   const fetchData = async () => {
-    if (!uid) {
-      console.error("No UID found in sessionStorage.");
-      return;
-    }
+    if (!currentUser) return;
 
     try {
-      const docRef = doc(db, "users", uid);
+      setLoading(true);
+      const docRef = doc(db, "users", currentUser.uid);
       const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        setData(docSnap.data());
-      } else {
-        console.error("No such document!");
-      }
+      if (docSnap.exists()) setData(docSnap.data());
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      showNotification("Failed to load profile", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, [currentUser]);
 
-  // Handle input changes
-  const handleInput = (e) => {
-    const { id, value } = e.target;
-    setData({ ...data, [id]: value });
-  };
-
-  // Update profile details
+  // Update profile (modified to not use setUser)
   const handleSubmitUpdateDetails = async (e) => {
     e.preventDefault();
-
-    if (!uid) {
-      console.error("UID not found.");
-      return;
-    }
+    if (!currentUser) return;
 
     try {
-      const updateData = doc(db, "users", uid);
-      await updateDoc(updateData, { ...data });
-
-      props.setUser(data); // Update UI immediately
-      notifyUpdate();
-
-      // Fetch updated data from Firestore
-      const updatedUserSnap = await getDoc(updateData);
-      if (updatedUserSnap.exists()) {
-        props.setUser(updatedUserSnap.data());
-      }
+      setLoading(true);
+      const userRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userRef, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        updatedAt: serverTimestamp()
+      });
+      showNotification("Profile updated successfully!");
+      fetchData(); // Refresh data after update
     } catch (error) {
-      console.error("Error updating profile:", error);
+      showNotification(error.message || "Update failed", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Send password reset email
+  // Password reset function remains the same
   const resetPassword = async () => {
-    const auth = getAuth();
-
     if (!data.email) {
-      notifyError("No email found for this user.");
+      showNotification("No email found", "error");
       return;
     }
-
     try {
+      setResetLoading(true);
       await sendPasswordResetEmail(auth, data.email);
-      notifySuccess();
+      showNotification("Reset link sent to your email");
     } catch (error) {
-      console.error("Error sending password reset email:", error);
-      notifyError("Failed to send password reset email.");
+      showNotification(error.message || "Reset failed", "error");
+    } finally {
+      setResetLoading(false);
     }
   };
+
+  if (loading && !data) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
+        <CircularProgress size={60} sx={{ color: "#5c6bc0" }} />
+      </Box>
+    );
+  }
 
   return (
-    <>
-      <Grid container spacing={2}>
-        <Grid item xs={11} sm={11} md={5} lg={4}>
+    <Box sx={{ p: 3, background: "linear-gradient(135deg, #e0f7fa, #bbdefb, #d1c4e9)", minHeight: "100vh" }}>
+      <Container maxWidth="lg">
+        <Grid container spacing={3} justifyContent="center">
           {/* Profile Section */}
-          <Container>
-            <CssBaseline />
-            <Box sx={{ display: "flex", flexDirection: "column", padding: "20px" }} component={Paper}>
-              <Typography component="h1" variant="h5">
-                Profile
+          <Grid item xs={12} md={6}>
+            <StyledPaper>
+              <Typography variant="h4" gutterBottom sx={{ color: "#5c6bc0", fontWeight: 700 }}>
+                Profile Settings
               </Typography>
-
-              <Divider sx={{ marginY: "15px" }} />
-
-              <Box component="form" sx={{ mt: 3 }} onSubmit={handleSubmitUpdateDetails}>
+              <Box component="form" onSubmit={handleSubmitUpdateDetails}>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <TextField
-                      variant="standard"
-                      name="firstName"
-                      required
                       fullWidth
-                      type="text"
+                      required
                       id="firstName"
                       label="First Name"
-                      onChange={handleInput}
                       value={data.firstName || ""}
+                      onChange={(e) => setData({...data, firstName: e.target.value})}
+                      variant="outlined"
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
-                      variant="standard"
-                      name="lastName"
-                      required
                       fullWidth
-                      type="text"
+                      required
                       id="lastName"
                       label="Last Name"
-                      onChange={handleInput}
                       value={data.lastName || ""}
+                      onChange={(e) => setData({...data, lastName: e.target.value})}
+                      variant="outlined"
                     />
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
-                      variant="standard"
-                      name="email"
-                      required
                       fullWidth
                       id="email"
-                      type="email"
                       label="Email"
-                      disabled
                       value={data.email || ""}
-                      InputLabelProps={{ shrink: true }}
+                      disabled
+                      variant="outlined"
                     />
                   </Grid>
                 </Grid>
-                <Button fullWidth variant="outlined" sx={{ mt: 3, mb: 2 }} type="submit">
-                  Update
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{ mt: 3, bgcolor: "#5c6bc0", "&:hover": { bgcolor: "#3949ab" } }}
+                  disabled={loading}
+                >
+                  {loading ? "Saving..." : "Save Changes"}
                 </Button>
               </Box>
-            </Box>
-          </Container>
-        </Grid>
+            </StyledPaper>
+          </Grid>
 
-        <Grid item xs={11} sm={11} md={5} lg={4}>
-          {/* Change Password Section */}
-          <Container>
-            <CssBaseline />
-            <Box sx={{ display: "flex", flexDirection: "column", padding: "20px" }} component={Paper}>
-              <Typography component="h1" variant="h5">
-                Reset Password
+          {/* Password Reset Section */}
+          <Grid item xs={12} md={6}>
+            <StyledPaper>
+              <Typography variant="h4" gutterBottom sx={{ color: "#5c6bc0", fontWeight: 700 }}>
+                Password Reset
               </Typography>
-
-              <Divider sx={{ marginY: "15px" }} />
-
-              <Typography>
-                Reset your password via email{" "}
-                <Button variant="text" onClick={resetPassword}>
-                  Send me mail
-                </Button>
-              </Typography>
-            </Box>
-          </Container>
+              <Button
+                onClick={resetPassword}
+                variant="contained"
+                sx={{ bgcolor: "#5c6bc0", "&:hover": { bgcolor: "#3949ab" } }}
+                disabled={resetLoading || !data.email}
+              >
+                {resetLoading ? "Sending..." : "Reset Password"}
+              </Button>
+            </StyledPaper>
+          </Grid>
         </Grid>
-      </Grid>
+      </Container>
       <ToastContainer />
-    </>
+    </Box>
   );
 };
 

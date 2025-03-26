@@ -1,86 +1,126 @@
-import { Avatar, Button, CssBaseline, Divider, Grid, Paper, TextField, Typography } from '@mui/material';
-import { Box, Container } from '@mui/system';
 import React, { useEffect, useState } from 'react';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-
-// Icons
-import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-
-// Firebase
+import { 
+  Avatar, 
+  Button, 
+  CssBaseline, 
+  Divider, 
+  Grid, 
+  Paper, 
+  TextField, 
+  Typography,
+  Box, 
+  Container,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
+} from '@mui/material';
+import { 
+  DeleteOutlined as DeleteOutlinedIcon,
+  EditOutlined as EditOutlinedIcon 
+} from '@mui/icons-material';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../../../firebase';
 import { collection, doc, getDocs, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
-
-// Toastify
-import { ToastContainer, toast } from 'material-react-toastify';
-import 'material-react-toastify/dist/ReactToastify.css';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const PtoManage = () => {
-  // Toastify notifications
+  // Toast notifications
   const notifySuccess = (message) => toast.success(message);
   const notifyError = (message) => toast.error(message);
 
-  // State
-  const [passError, setPassError] = useState(false);
-  const [emailError, setEmailError] = useState(false);
-  const [allErrors, setAllErrors] = useState(false);
-  const [row, setRow] = useState([]);
-  const [data, setData] = useState({});
+  // State management
+  const [errors, setErrors] = useState({
+    password: false,
+    email: false,
+    allFields: false
+  });
+  const [users, setUsers] = useState([]);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: ''
+  });
 
-  // Fetch data from Firestore
-  const fetchData = async () => {
-    let list = [];
+  // Fetch users from Firestore
+  const fetchUsers = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'));
-      querySnapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      setRow(list);
+      const userList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsers(userList);
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching users:", error);
+      notifyError("Failed to load users");
     }
   };
 
-  // Handle form input
-  const handleInput = (e) => {
+  // Handle form input changes
+  const handleInputChange = (e) => {
     const { id, value } = e.target;
-    setData({ ...data, [id]: value });
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+    // Reset errors when typing
+    if (id === 'email') setErrors(prev => ({ ...prev, email: false }));
+    if (id === 'password') setErrors(prev => ({ ...prev, password: false }));
+    setErrors(prev => ({ ...prev, allFields: false }));
   };
 
-  // Handle user creation
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
+      setErrors(prev => ({ ...prev, allFields: true }));
+      notifyError("All fields are required");
+      return;
+    }
+
     try {
-      const res = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      delete data.password; // Don't store passwords in Firestore
+      // Create user in Firebase Auth
+      const res = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      
+      // Create user document in Firestore
       await setDoc(doc(db, 'users', res.user.uid), {
-        ...data,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
         userType: 'pto',
-        timeStamp: serverTimestamp(),
+        timeStamp: serverTimestamp()
       });
-      fetchData();
-      notifySuccess('PTO user created successfully.');
+
+      // Reset form and fetch updated list
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: ''
+      });
+      await fetchUsers();
+      notifySuccess("PTO user created successfully");
     } catch (error) {
-      console.log(error.code);
+      console.error("Error creating user:", error);
       switch (error.code) {
         case 'auth/email-already-in-use':
-          notifyError('The provided email is already in use.');
-          setEmailError(true);
+          setErrors(prev => ({ ...prev, email: true }));
+          notifyError("Email already in use");
           break;
         case 'auth/weak-password':
-          notifyError('Password must be at least six characters.');
-          setPassError(true);
-          break;
-        case 'auth/internal-error':
-        case 'auth/admin-restricted-operation':
-          notifyError('All fields are required.');
-          setAllErrors(true);
+          setErrors(prev => ({ ...prev, password: true }));
+          notifyError("Password must be at least 6 characters");
           break;
         default:
           notifyError(error.message);
@@ -88,136 +128,164 @@ const PtoManage = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Delete user function
-  const handleDelete = async (userId) => {
-    try {
-      await deleteDoc(doc(db, 'users', userId)); // Delete from Firestore
-      notifySuccess('User deleted successfully.');
-      fetchData(); // Refresh data
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      notifyError('Failed to delete user.');
+  // Delete user
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+        await fetchUsers();
+        notifySuccess("User deleted successfully");
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        notifyError("Failed to delete user");
+      }
     }
   };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   return (
-    <>
-      <Grid container spacing={2}>
-        <Grid item xs={11} sm={11} md={5} lg={4}>
-          {/* PTO Creation Section */}
-          <Container>
-            <CssBaseline />
-            <Box sx={{ display: 'flex', flexDirection: 'column', padding: '20px' }} component={Paper}>
-              <Typography component="h1" variant="h5">
-                Create PTO
-              </Typography>
-              <Divider sx={{ marginY: '15px' }} />
-              <Box component="form" sx={{ mt: 3 }} onSubmit={handleSubmit}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      variant="standard"
-                      required
-                      fullWidth
-                      id="firstName"
-                      label="First Name"
-                      autoFocus
-                      error={allErrors}
-                      onChange={handleInput}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      variant="standard"
-                      required
-                      fullWidth
-                      id="lastName"
-                      label="Last Name"
-                      error={allErrors}
-                      onChange={handleInput}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      variant="standard"
-                      required
-                      fullWidth
-                      id="email"
-                      label="Email Address"
-                      error={emailError || allErrors}
-                      onChange={handleInput}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      variant="standard"
-                      required
-                      fullWidth
-                      name="password"
-                      label="Password"
-                      type="password"
-                      id="password"
-                      error={passError || allErrors}
-                      onChange={handleInput}
-                    />
-                  </Grid>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Grid container spacing={3}>
+        {/* Create PTO Form */}
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Create PTO User
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
+            <Box component="form" onSubmit={handleSubmit}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    required
+                    fullWidth
+                    id="firstName"
+                    label="First Name"
+                    variant="outlined"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    error={errors.allFields && !formData.firstName}
+                  />
                 </Grid>
-                <Button fullWidth variant="outlined" sx={{ mt: 3, mb: 2 }} type="submit">
-                  Create
-                </Button>
-              </Box>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    required
+                    fullWidth
+                    id="lastName"
+                    label="Last Name"
+                    variant="outlined"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    error={errors.allFields && !formData.lastName}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    id="email"
+                    label="Email Address"
+                    type="email"
+                    variant="outlined"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    error={errors.email || (errors.allFields && !formData.email)}
+                    helperText={errors.email && "Email already in use"}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    id="password"
+                    label="Password"
+                    type="password"
+                    variant="outlined"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    error={errors.password || (errors.allFields && !formData.password)}
+                    helperText={errors.password && "Password must be at least 6 characters"}
+                  />
+                </Grid>
+              </Grid>
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                sx={{ mt: 3, mb: 2 }}
+              >
+                Create User
+              </Button>
             </Box>
-          </Container>
+          </Paper>
         </Grid>
 
-        {/* PTO List Table Section */}
-        <Grid item xs={11} sm={11} md={12} lg={8}>
-          <Container>
-            <CssBaseline />
-            <Box sx={{ padding: '20px' }} component={Paper}>
-              <Typography component="h1" variant="h5">
-                PTO List
-              </Typography>
-              <Divider sx={{ marginY: '15px' }} />
-              <TableContainer>
-                <Table sx={{ minWidth: 450 }} size="medium">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><b>Email</b></TableCell>
-                      <TableCell><b>First Name</b></TableCell>
-                      <TableCell><b>Last Name</b></TableCell>
-                      <TableCell><b>Manage</b></TableCell>
+        {/* PTO Users Table */}
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              PTO Users
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
+            <TableContainer>
+              <Table size="medium">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><b>Email</b></TableCell>
+                    <TableCell><b>First Name</b></TableCell>
+                    <TableCell><b>Last Name</b></TableCell>
+                    <TableCell align="right"><b>Actions</b></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users.filter(user => user.userType === 'pto').map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.firstName}</TableCell>
+                      <TableCell>{user.lastName}</TableCell>
+                      <TableCell align="right">
+                        <Button 
+                          color="primary"
+                          startIcon={<EditOutlinedIcon />}
+                          sx={{ mr: 1 }}
+                        >
+                          Edit
+                        </Button>
+                        <Button 
+                          color="error"
+                          startIcon={<DeleteOutlinedIcon />}
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          Delete
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {row.map((row) => (
-                      row.userType === 'pto' && (
-                        <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                          <TableCell>{row.email}</TableCell>
-                          <TableCell>{row.firstName}</TableCell>
-                          <TableCell>{row.lastName}</TableCell>
-                          <TableCell>
-                            <Button variant="text" color="error" onClick={() => handleDelete(row.id)} startIcon={<DeleteOutlinedIcon />} />
-                            <Button variant="text" startIcon={<EditOutlinedIcon />} />
-                          </TableCell>
-                        </TableRow>
-                      )
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          </Container>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
         </Grid>
       </Grid>
-      <ToastContainer />
-    </>
+      
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </Container>
   );
 };
 
 export default PtoManage;
-  

@@ -1,27 +1,58 @@
 import React, { useEffect, useState } from "react";
-import { styled } from "@mui/material/styles";
-import { Box, Switch, Button } from "@mui/material";
+import { 
+  Box, 
+  Switch, 
+  Button,
+  Typography,
+  LinearProgress,
+  Paper,
+  styled
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import * as XLSX from "xlsx"; // Import XLSX for Excel export
-
-// Firebase imports
+import * as XLSX from "xlsx";
 import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase"; // Ensure correct Firebase config import
+import { db } from "../../firebase";
+import DownloadIcon from '@mui/icons-material/Download';
+
+// Styled components for consistent UI
+const StyledButton = styled(Button)(({ theme }) => ({
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.common.white,
+  '&:hover': {
+    backgroundColor: theme.palette.primary.dark,
+  },
+  boxShadow: theme.shadows[3],
+  padding: theme.spacing(1.5, 3),
+  marginTop: theme.spacing(4),
+  borderRadius: theme.shape.borderRadius,
+}));
 
 const StudentsNew = () => {
-  const [row, setRow] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Fetch student data
   const fetchData = async () => {
     try {
+      setLoading(true);
       const querySnapshot = await getDocs(collection(db, "users"));
       const studentList = querySnapshot.docs
         .filter((doc) => doc.data().userType === "student")
-        .map((doc) => ({ id: doc.id, ...doc.data() }));
+        .map((doc) => ({ 
+          id: doc.id, 
+          erNo: doc.data().erNo || "N/A",
+          firstName: doc.data().firstName || "N/A",
+          lastName: doc.data().lastName || "N/A",
+          email: doc.data().email || "N/A",
+          isEnable: doc.data().isEnable || false
+        }));
 
-      setRow(studentList);
+      setRows(studentList);
     } catch (error) {
       console.error("Error fetching student data:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,36 +61,35 @@ const StudentsNew = () => {
   }, []);
 
   // Handle toggle change for enabling/disabling students
-  const handleChange = async (event, theUID) => {
+  const handleStatusChange = async (event, studentId) => {
     const newStatus = event.target.checked;
     try {
-      await updateDoc(doc(db, "users", theUID), { isEnable: newStatus });
-
-      // Update local state instead of refetching from Firestore
-      setRow((prevRows) =>
-        prevRows.map((row) =>
-          row.id === theUID ? { ...row, isEnable: newStatus } : row
+      await updateDoc(doc(db, "users", studentId), { isEnable: newStatus });
+      setRows(prevRows =>
+        prevRows.map(row =>
+          row.id === studentId ? { ...row, isEnable: newStatus } : row
         )
       );
-    } catch (e) {
-      console.error("Error updating status:", e);
+    } catch (error) {
+      console.error("Error updating status:", error);
     }
   };
 
-  // Function to export student applications report to Excel
+  // Export student applications to Excel
   const exportStudentsReport = async () => {
     try {
+      setExportLoading(true);
       const applicationsSnapshot = await getDocs(collection(db, "applications"));
       const studentList = applicationsSnapshot.docs.map((doc) => {
         const data = doc.data();
         return {
-          Enrollment_No: data.erNo ?? "N/A",
-          First_Name: data.firstName ?? "N/A",
-          Last_Name: data.lastName ?? "N/A",
-          Email: data.email ?? "N/A",
-          Applied_Drive: data.driveTitle ?? "N/A",
-          Company: data.companyName ?? "N/A",
-          Applied_On: data.appliedDate
+          "Enrollment No": data.erNo ?? "N/A",
+          "First Name": data.firstName ?? "N/A",
+          "Last Name": data.lastName ?? "N/A",
+          "Email": data.email ?? "N/A",
+          "Applied Drive": data.driveTitle ?? "N/A",
+          "Company": data.companyName ?? "N/A",
+          "Applied Date": data.appliedDate
             ? new Date(data.appliedDate.seconds * 1000).toLocaleDateString()
             : "N/A",
         };
@@ -70,55 +100,99 @@ const StudentsNew = () => {
         return;
       }
 
-      // Convert data to Excel
       const ws = XLSX.utils.json_to_sheet(studentList);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Applied Students");
-      XLSX.writeFile(wb, "Students_Report.xlsx");
-
-      alert("Students report has been downloaded.");
+      XLSX.utils.book_append_sheet(wb, ws, "Student Applications");
+      XLSX.writeFile(wb, `Student_Applications_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
     } catch (error) {
-      console.error("Error exporting students report:", error);
-      alert("Failed to export the report. Please try again.");
+      console.error("Error exporting report:", error);
+      alert("Failed to export report. Please try again.");
+    } finally {
+      setExportLoading(false);
     }
   };
 
-  // Columns for the DataGrid
+  // DataGrid columns configuration
   const columns = [
-    { field: "erNo", headerName: "Enrollment No", flex: 1 },
-    { field: "firstName", headerName: "First Name", flex: 1 },
-    { field: "lastName", headerName: "Last Name", flex: 1 },
-    { field: "email", headerName: "Email", flex: 1 },
+    { 
+      field: "erNo", 
+      headerName: "Enrollment No", 
+      flex: 1,
+      minWidth: 150 
+    },
+    { 
+      field: "firstName", 
+      headerName: "First Name", 
+      flex: 1,
+      minWidth: 150 
+    },
+    { 
+      field: "lastName", 
+      headerName: "Last Name", 
+      flex: 1,
+      minWidth: 150 
+    },
+    { 
+      field: "email", 
+      headerName: "Email", 
+      flex: 1,
+      minWidth: 200 
+    },
     {
       field: "isEnable",
       headerName: "Status",
       flex: 1,
-      renderCell: (param) => (
-        <Switch checked={param.row.isEnable} onChange={(event) => handleChange(event, param.row.id)} />
+      minWidth: 120,
+      renderCell: (params) => (
+        <Switch 
+          checked={params.row.isEnable} 
+          onChange={(e) => handleStatusChange(e, params.row.id)}
+          color="primary"
+        />
       ),
     },
   ];
 
   return (
-    <>
-      <Box sx={{ height: 400, width: "100%" }}>
-        <DataGrid
-          rows={row}
-          columns={columns}
-          pageSize={5}
-          rowsPerPageOptions={[5]}
-          disableSelectionOnClick
-        />
-      </Box>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
+        Student Management
+      </Typography>
+      
+      <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ height: 500, width: '100%' }}>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            loading={loading}
+            pageSize={10}
+            rowsPerPageOptions={[5, 10, 20]}
+            disableSelectionOnClick
+            components={{
+              LoadingOverlay: LinearProgress,
+            }}
+            sx={{
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: '#f5f5f5',
+              },
+              '& .MuiDataGrid-cell': {
+                borderRight: '1px solid #f0f0f0',
+              },
+            }}
+          />
+        </Box>
+      </Paper>
 
-      {/* Export Button */}
-      <Button
+      <StyledButton
+        variant="contained"
+        startIcon={<DownloadIcon />}
         onClick={exportStudentsReport}
-        sx={{ mt: 5, color: "white", backgroundColor: "#1976D2", boxShadow: "0px 0px 10px 0px", px: 2, py: 1 }}
+        disabled={exportLoading}
       >
-        Download Students Report
-      </Button>
-    </>
+        {exportLoading ? 'Exporting...' : 'Export Student Applications'}
+      </StyledButton>
+    </Box>
   );
 };
 

@@ -1,59 +1,82 @@
-import { AppBar, Avatar, Button, CssBaseline, Dialog, Divider, Fab, Grid, IconButton, InputAdornment, MenuItem, OutlinedInput, Paper, Select, Slide, Switch, TextField, Toolbar, Typography } from '@mui/material'
-import { Box, Container } from '@mui/system'
-import React, { useEffect, useState } from 'react'
+import {
+  AppBar,
+  Button,
+  CssBaseline,
+  Dialog,
+  Divider,
+  Grid,
+  IconButton,
+  InputAdornment,
+  Paper,
+  Slide,
+  TextField,
+  Toolbar,
+  Typography
+} from '@mui/material';
+import { Box, Container } from '@mui/system';
+import React, { useEffect, useState } from 'react';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell, { tableCellClasses } from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import { styled } from '@mui/material/styles';
 
-// imports for icons 
+// Icons
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-
 import CloseIcon from '@mui/icons-material/Close';
+import AddIcon from '@mui/icons-material/Add';
 
-//firebase
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+// Firebase
 import { auth, db } from '../../firebase';
 import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 
-
-// tostify
+// Toastify
 import { ToastContainer, toast } from 'material-react-toastify';
 import 'material-react-toastify/dist/ReactToastify.css';
 
-// for drawer
+// Drawer Transition
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
+// Styled Components
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  [`&.${tableCellClasses.head}`]: {
+    backgroundColor: '#5c6bc0',
+    color: theme.palette.common.white,
+    fontWeight: 'bold',
+  },
+  [`&.${tableCellClasses.body}`]: {
+    fontSize: 14,
+  },
+}));
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  '&:nth-of-type(odd)': {
+    backgroundColor: theme.palette.action.hover,
+  },
+  '&:hover': {
+    backgroundColor: theme.palette.action.selected,
+  },
+  '&:last-child td, &:last-child th': {
+    border: 0,
+  },
+}));
+
 const ManageDrives = () => {
+  // Toast notifications
+  const notifySuccess = (message) => toast.success(message);
+  const notifyError = (message) => toast.error(message);
 
-  //tostify
-  const notifyDriveCreated = () => toast.success("Drive Created ...");
-  const notifyDriveDeleted = () => toast.success("Drive Deleted ...");
-  const notifyError = (errorMessage) => toast.error(errorMessage);
-
-  // Drive table
+  // State management
   const [row, setRow] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [editingDrive, setEditingDrive] = useState(null);
 
-  const fatchData = async () => {
-    let list = [];
-    try {
-      const querySnapshot = await getDocs(collection(db, "drives"));
-      querySnapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() })
-      });
-      setRow(list)
-    }
-    catch (error) {
-      console.log(error);
-    }
-  }
-
-  // form data
+  // Form data
   const [data, setData] = useState({
     driveTitle: '',
     driveCompanyName: '',
@@ -63,22 +86,64 @@ const ManageDrives = () => {
     driveHscPerc: '',
     driveBachelorPerc: '',
     driveNoOpenings: '',
-    driveBond: '',
+    driveBond: 'no',
     driveBondTime: '',
     driveDesc: '',
     driveInterviewMode: '',
     driveWebsiteLink: '',
     driveContactNo: '',
     driveRegards: '',
-    driveUploadImage: null,
   });
 
-  const handleInput = (e) => {
-    const id = e.target.id;
-    const value = e.target.value;
-    setData({ ...data, [id]: value });
-  }
+  // Fetch drives data
+  const fetchData = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "drives"));
+      const today = new Date().toISOString().split("T")[0];
+      const drivesList = [];
 
+      querySnapshot.forEach((doc) => {
+        const driveData = doc.data();
+        if (driveData.driveLastDate >= today) {
+          drivesList.push({ 
+            id: doc.id, 
+            ...driveData,
+            createDate: formatDate(driveData.createDate || driveData.date),
+            driveLastDate: formatDate(driveData.driveLastDate)
+          });
+        } else {
+          deleteDoc(doc.ref); // Remove expired drives
+        }
+      });
+
+      setRow(drivesList);
+    } catch (error) {
+      console.error("Error fetching drives:", error);
+      notifyError("Failed to load drives");
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  // Handle input changes
+  const handleInput = (e) => {
+    const { id, value } = e.target;
+    setData(prev => ({ ...prev, [id]: value }));
+  };
+
+  // Reset form fields
   const resetInput = () => {
     setData({
       driveTitle: '',
@@ -89,60 +154,54 @@ const ManageDrives = () => {
       driveHscPerc: '',
       driveBachelorPerc: '',
       driveNoOpenings: '',
-      driveBond: '',
+      driveBond: 'no',
       driveBondTime: '',
       driveDesc: '',
       driveInterviewMode: '',
       driveWebsiteLink: '',
       driveContactNo: '',
       driveRegards: '',
-      driveUploadImage: null,
     });
-  }
-const [drives, setDrives] = useState([]);
-  useEffect(() => {
-    fatchData()
-    const fetchAndFilterDrives = async () => {
-      const querySnapshot = await getDocs(collection(db, "drives")); // 🔹 Fetch all drives
-      const today = new Date().toISOString().split("T")[0]; // 🔹 Get today’s date in YYYY-MM-DD format
-  
-      const validDrives = [];
-  
-      querySnapshot.forEach(async (driveDoc) => {
-        const driveData = driveDoc.data();
-        if (driveData.driveLastDate >= today) {
-          validDrives.push({ id: driveDoc.id, ...driveData }); // ✅ Keep valid (future) drives
-        } else {
-          await deleteDoc(doc(db, "drives", driveDoc.id)); // ❌ Delete expired drives
-        }
-      });
-  
-      setDrives(validDrives); // 🔹 Update state with valid drives only
-    };
-  
-    fetchAndFilterDrives();
-  }, []);
-  
+  };
 
-  // drawer
-  const [open, setOpen] = React.useState(false);
-
-  const handleClickOpen = () => {
+  // Handle edit drive
+  const handleEdit = (drive) => {
+    setEditingDrive(drive);
+    setData({
+      driveTitle: drive.driveTitle,
+      driveCompanyName: drive.driveCompanyName,
+      driveLastDate: drive.driveLastDate,
+      driveSalary: drive.driveSalary,
+      driveSscPerc: drive.driveSscPerc || '',
+      driveHscPerc: drive.driveHscPerc || '',
+      driveBachelorPerc: drive.driveBachelorPerc || '',
+      driveNoOpenings: drive.driveNoOpenings || '',
+      driveBond: drive.driveBond || 'no',
+      driveBondTime: drive.driveBondTime || '',
+      driveDesc: drive.driveDesc || '',
+      driveInterviewMode: drive.driveInterviewMode || '',
+      driveWebsiteLink: drive.driveWebsiteLink || '',
+      driveContactNo: drive.driveContactNo || '',
+      driveRegards: drive.driveRegards || '',
+    });
     setOpen(true);
   };
 
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  // handle submit drive
- /* const handleSubmitDrive = async (e) => {
+  // Submit drive form
+  const handleSubmitDrive = async (e) => {
     e.preventDefault();
 
-    // Validate the form fields
-    if (!data.driveTitle || !data.driveCompanyName || !data.driveLastDate || !data.driveSalary || !data.driveInterviewMode || !data.driveWebsiteLink) {
-      notifyError('Please fill all required fields');
-      return;
+    // Validation
+     const requiredFields = [
+      'driveTitle', 'driveCompanyName', 'driveLastDate', 
+      'driveSalary', 'driveInterviewMode', 'driveWebsiteLink'
+    ];
+    
+     for (const field of requiredFields) {
+      if (!data[field]) {
+        notifyError(`Please fill in ${field.replace('drive', '')}`);
+        return;
+      }
     }
 
     if (new Date(data.driveLastDate) < new Date()) {
@@ -150,284 +209,246 @@ const [drives, setDrives] = useState([]);
       return;
     }
 
-    if (isNaN(data.driveSalary)) {
-      notifyError('Salary must be a numeric value');
+    if (isNaN(data.driveSalary) || parseFloat(data.driveSalary) <= 0) {
+      notifyError('Salary must be a positive number');
       return;
     }
 
-    if (data.driveBond === 'yes' && !data.driveBondTime) {
-      notifyError('Bond time is required if bond/agreement is yes');
-      return;
-    }
-
-    if (data.driveBond === 'yes' && isNaN(data.driveBondTime)) {
-      notifyError('Bond time must be a numeric value');
+    if (data.driveBond === 'yes' && (!data.driveBondTime || isNaN(data.driveBondTime))) {
+      notifyError('Please enter valid bond time in months');
       return;
     }
 
     if (!/^\d{10}$/.test(data.driveContactNo)) {
-      notifyError('Contact number must be a valid 10-digit mobile number');
+      notifyError('Contact number must be 10 digits');
       return;
     }
 
-    let currentDate = new Date().toJSON().slice(0, 10);
+    // Percentage validations
+    const percentageFields = ['driveSscPerc', 'driveHscPerc', 'driveBachelorPerc'];
+    for (const field of percentageFields) {
+      if (data[field] && (isNaN(data[field]) || data[field] < 0 || data[field] > 100)){
+        notifyError(`${field.replace('drive', '')} must be between 0 and 100`);
+        return;
+      }
+    }
+
     try {
-      // Add a new document with a generated id.
-      const docRef = await addDoc(collection(db, "drives"), {
-        ...data,
-        createDate: currentDate
-      });
+      if (editingDrive) {
+        // Update existing drive
+        await setDoc(doc(db, "drives", editingDrive.id), {
+          ...data,
+          createDate: editingDrive.createDate // Preserve original date
+        });
+        notifySuccess("Drive updated successfully!");
+      } else {
+        // Create new drive
+        const currentDate = new Date().toJSON().slice(0, 10);
+        const docRef = await addDoc(collection(db, "drives"), {
+          ...data,
+          createDate: currentDate
+        });
+        await setDoc(doc(db, "applications", docRef.id), {
+          appliedList: [],
+          selectedList: []
+        });
+        notifySuccess("Drive created successfully!");
+      }
 
-      await setDoc(doc(db, "applications", docRef.id), {
-        appliedList: [],
-        selectedList: []
-      });
-
-      fatchData()
-      notifyDriveCreated()
+      fetchData();
+      handleClose();
+    } catch (error) {
+      console.error("Error saving drive:", error);
+      notifyError(error.message || 'Failed to save drive');
     }
-    catch (e) {
-      console.log(e);
-      notifyError(e)
-    }
-  }*/
-    const handleSubmitDrive = async (e) => {
-      e.preventDefault();
-  
-      // Validate the form fields
-      if (!data.driveTitle || !data.driveCompanyName || !data.driveLastDate || !data.driveSalary || !data.driveInterviewMode || !data.driveWebsiteLink) {
-        notifyError('Please fill all required fields');
-        return;
-      }
-  
-      if (new Date(data.driveLastDate) < new Date()) {
-        notifyError('Last date cannot be in the past');
-        return;
-      }
-  
-      if (isNaN(data.driveSalary)) {
-        notifyError('Salary must be a numeric value');
-        return;
-      }
-  
-      if (data.driveBond === 'yes' && !data.driveBondTime) {
-        notifyError('Bond time is required if bond/agreement is yes');
-        return;
-      }
-  
-      if (data.driveBond === 'yes' && isNaN(data.driveBondTime)) {
-        notifyError('Bond time must be a numeric value');
-        return;
-      }
-  
-      if (!/^\d{10}$/.test(data.driveContactNo)) {
-        notifyError('Contact number must be a valid 10-digit mobile number');
-        return;
-      }
-  
-      let currentDate = new Date().toJSON().slice(0, 10);
-  
-      try {
-          // *Check if the drive already exists*
-          const querySnapshot = await getDocs(collection(db, "drives"));
-          let isDuplicate = false;
-  
-          querySnapshot.forEach((doc) => {
-              const existingDrive = doc.data();
-              if (
-                  existingDrive.driveTitle.toLowerCase() === data.driveTitle.toLowerCase() &&
-                  existingDrive.driveCompanyName.toLowerCase() === data.driveCompanyName.toLowerCase()
-              ) {
-                  isDuplicate = true;
-              }
-          });
-  
-          if (isDuplicate) {
-              notifyError("A drive with the same title and company name already exists!");
-              return;
-          }
-  
-          // *If no duplicate, proceed with adding the drive*
-          const docRef = await addDoc(collection(db, "drives"), {
-              ...data,
-              createDate: currentDate
-          });
-  
-          await setDoc(doc(db, "applications", docRef.id), {
-              appliedList: [],
-              selectedList: []
-          });
-  
-          fatchData();
-          notifyDriveCreated();
-      } catch (e) {
-          console.log(e);
-          notifyError(e.message);
-      }
   };
-  
-  
 
-  // handle delete drive
+  // Delete drive
   const handleDelete = async (driveId) => {
+    if (!window.confirm('Are you sure you want to delete this drive?')) return;
+    
     try {
       await deleteDoc(doc(db, "drives", driveId));
-      fatchData();
-      notifyDriveDeleted();
+      await deleteDoc(doc(db, "applications", driveId));
+      fetchData();
+      notifySuccess('Drive deleted successfully');
+    } catch (error) {
+      console.error("Error deleting drive:", error);
+      notifyError('Failed to delete drive');
     }
-    catch (e) {
-      console.log(e);
-    }
-  }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Dialog handlers
+  const handleClickOpen = () => {
+    setEditingDrive(null);
+    setOpen(true);
+  };
+  
+  const handleClose = () => {
+    setOpen(false);
+    setEditingDrive(null);
+    resetInput();
+  };
 
   return (
-    <>
-      <Grid container spacing={1}>
-
+    <Box sx={{ 
+      background: 'linear-gradient(135deg, #e0f7fa, #bbdefb, #d1c4e9)',
+      minHeight: '100vh',
+      p: 3
+    }}>
+      <CssBaseline />
+      
+      <Grid container spacing={3}>
+        {/* Create/Edit Drive Dialog */}
         <Dialog
           fullScreen
           open={open}
           onClose={handleClose}
           TransitionComponent={Transition}
+          PaperProps={{
+            sx: {
+              background: 'linear-gradient(135deg, #e0f7fa, #bbdefb, #d1c4e9)'
+            }
+          }}
         >
-          <AppBar sx={{ position: 'relative' }}>
+          <AppBar sx={{ position: 'relative', bgcolor: '#5c6bc0' }}>
             <Toolbar>
-              <IconButton
-                edge="start"
-                color="inherit"
-                onClick={handleClose}
-                aria-label="close"
-              >
+              <IconButton edge="start" color="inherit" onClick={handleClose}>
                 <CloseIcon />
               </IconButton>
+              <Typography sx={{ ml: 2, flex: 1 }} variant="h6">
+                {editingDrive ? 'Edit Drive' : 'Create New Drive'}
+              </Typography>
             </Toolbar>
           </AppBar>
 
-          <Grid item xs={12} sm={12} md={12} lg={12}>
-            {/* Drive section */}
-
-            <CssBaseline />
-            <Box
-              sx={{ padding: '20px' }}
-            >
-              <Typography variant="h6" >
-                Create Drive
+          <Container maxWidth="lg" sx={{ py: 4 }}>
+            <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+              <Typography variant="h5" gutterBottom sx={{ color: '#5c6bc0' }}>
+                Drive Information
               </Typography>
+              <Divider sx={{ my: 3 }} />
 
-              <Divider sx={{ marginY: '10px' }} />
-
-              <Box
-                component="form"
-                noValidate
-                onSubmit={handleSubmitDrive}
-              >
-                {/* General Grid */}
-                <Typography variant="body2" sx={{ marginY: '10px' }}>
-                  General
+              <Box component="form" onSubmit={handleSubmitDrive}>
+                {/* General Information */}
+                <Typography variant="subtitle1" sx={{ mb: 2, color: '#5c6bc0' }}>
+                  General Information
                 </Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={12} md={6} lg={3}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveTitle"
-                      name="driveTitle"
-                      label="Title"
+                      // required
                       fullWidth
-                      type='text'
-                      variant="outlined"
+                      id="driveTitle"
+                      label="Drive Title"
                       value={data.driveTitle}
                       onChange={handleInput}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={12} md={6} lg={3}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveCompanyName"
-                      name="driveCompanyName"
-                      label="Company Name"
+                      // required
                       fullWidth
-                      type='text'
-                      variant="outlined"
+                      id="driveCompanyName"
+                      label="Company Name"
                       value={data.driveCompanyName}
                       onChange={handleInput}
                     />
                   </Grid>
-                  {/* <Grid item xs={12} sm={12} md={6} lg={3}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveLastDate"
-                      name="driveLastDate"
+                      // required
                       fullWidth
-                      variant="outlined"
-                      type='date'
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">Last Date</InputAdornment>,
-                      }}
-                      value={data.driveLastDate}
-                      onChange={handleInput}
-                    />
-                  </Grid> */}
-                  <Grid item xs={12} sm={12} md={6} lg={3}>
-                    <TextField
-                      required
                       id="driveLastDate"
-                      name="driveLastDate"
-                      fullWidth
-                      variant="outlined"
+                      label="Last Date"
                       type="date"
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">Last Date</InputAdornment>,
-                      }}
-                      inputProps={{
-                        min: new Date().toISOString().split("T")[0], // ✅ Disable past dates
-                      }}
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{ min: new Date().toISOString().split("T")[0] }}
                       value={data.driveLastDate}
                       onChange={handleInput}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={12} md={6} lg={3}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveSalary"
-                      name="driveSalary"
+                      // required
                       fullWidth
-                      variant="outlined"
-                      type='number'
-                      label="Salary"
+                      id="driveSalary"
+                      label="Salary (per annum)"
+                      type="number"
                       value={data.driveSalary}
                       onChange={handleInput}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                      }}
                     />
                   </Grid>
                 </Grid>
 
-                {/* Bond Grid */}
-                <Typography variant="body2" sx={{ marginY: '10px' }}>
-                  Bond/Agreement
+                {/* Academic Requirements */}
+                <Typography variant="subtitle1" sx={{ mt: 4, mb: 2, color: '#5c6bc0' }}>
+                  Academic Requirements (%)
                 </Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={12} md={6} lg={6}>
+                  <Grid item xs={12} md={4}>
                     <TextField
-                      required
-                      id="driveBond"
-                      name="driveBond"
-                      label="Bond/Agreement"
                       fullWidth
-                      type='text'
-                      variant="outlined"
-                      value={data.driveBond}
+                      id="driveSscPerc"
+                      label="Minimum SSC Percentage"
+                      type="number"
+                      value={data.driveSscPerc}
                       onChange={handleInput}
-                      helperText="if not, mention nill"
+                      inputProps={{ min: 0, max: 100, step: 0.01 }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={12} md={6} lg={6}>
+                  <Grid item xs={12} md={4}>
                     <TextField
-                      required={data.driveBond === 'yes'}
-                      id="driveBondTime"
-                      name="driveBondTime"
-                      label="Bond Time (in months)"
                       fullWidth
-                      type='number'
-                      variant="outlined"
+                      id="driveHscPerc"
+                      label="Minimum HSC Percentage"
+                      type="number"
+                      value={data.driveHscPerc}
+                      onChange={handleInput}
+                      inputProps={{ min: 0, max: 100, step: 0.01 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      id="driveBachelorPerc"
+                      label="Minimum Bachelor Percentage"
+                      type="number"
+                      value={data.driveBachelorPerc}
+                      onChange={handleInput}
+                      inputProps={{ min: 0, max: 100, step: 0.01 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                {/* Bond Agreement */}
+                <Typography variant="subtitle1" sx={{ mt: 4, mb: 2, color: '#5c6bc0' }}>
+                  Bond Agreement
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      id="driveBond"
+                      label="Bond Agreement (yes/no)"
+                      value={data.driveBond}
+                      onChange={handleInput}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      id="driveBondTime"
+                      label="Bond Duration (months)"
+                      type="number"
                       value={data.driveBondTime}
                       onChange={handleInput}
                       disabled={data.driveBond !== 'yes'}
@@ -435,216 +456,179 @@ const [drives, setDrives] = useState([]);
                   </Grid>
                 </Grid>
 
-                {/* Description Grid */}
-                <Typography variant="body2" sx={{ marginY: '10px' }}>
-                  Description
+                {/* Job Description */}
+                <Typography variant="subtitle1" sx={{ mt: 4, mb: 2, color: '#5c6bc0' }}>
+                  Job Description
                 </Typography>
+                            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  // required
+                  fullWidth
+                  id="driveDesc" // This should match your state key
+                  name="driveDesc" // Add name attribute
+                  label="Job Description"
+                  multiline
+                  rows={4}
+                  value={data.driveDesc}
+                  onChange={handleInput}
+                />
+              </Grid>
+                            </Grid>
 
+                {/* Additional Information */}
+                <Typography variant="subtitle1" sx={{ mt: 4, mb: 2, color: '#5c6bc0' }}>
+                  Additional Information
+                </Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveDesc"
-                      name='driveDesc'
-                      label="Description"
-                      multiline
+                   //  required
                       fullWidth
-                      rows={4}
-                      value={data.driveDesc}
-                      onChange={handleInput}
-                    />
-                  </Grid>
-                </Grid>
-
-                {/* Other Grid */}
-                <Typography variant="body2" sx={{ marginY: '10px' }}>
-                  Other Details
-                </Typography>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} sm={12} md={6} lg={4}>
-                    <TextField
-                      required
                       id="driveInterviewMode"
-                      name="driveInterviewMode"
                       label="Interview Mode"
-                      fullWidth
-                      type='text'
-                      variant="outlined"
                       value={data.driveInterviewMode}
                       onChange={handleInput}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={12} md={6} lg={4}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
-                      id="driveWebsiteLink"
-                      name="driveWebsiteLink"
-                      label="Website Link"
+                     // required
                       fullWidth
-                      type='text'
-                      variant="outlined"
+                      id="driveWebsiteLink"
+                      label="Company Website"
                       value={data.driveWebsiteLink}
                       onChange={handleInput}
                     />
                   </Grid>
-                  {/* <Grid item xs={12} sm={12} md={6} lg={4}>
+                  <Grid item xs={12} md={6}>
                     <TextField
-                      required
+                     //required
+                      fullWidth
                       id="driveContactNo"
-                      name="driveContactNo"
-                      label="Contact No"
-                      fullWidth
-                      type='number'
-                      variant="outlined"
+                      label="Contact Number"
                       value={data.driveContactNo}
-                      onChange={handleInput}
-                    />
-                  </Grid> */}
-                  <Grid item xs={12} sm={12} md={6} lg={4}>
-       <TextField
-             required
-             id="driveContactNo"
-         name="driveContactNo"
-    label="Contact No"
-    fullWidth
-    type="text" // Change to text to allow regex validation
-    variant="outlined"
-    value={data.driveContactNo}
-    onChange={(e) => {
-      const regex = /^[0-9]{0,10}$/; // Allows up to 10 digits only
-      if (regex.test(e.target.value)) {
-        handleInput(e); // Only update if the input matches the regex
-      }
-    }}
-    inputProps={{
-      maxLength: 10, // Ensures a maximum of 10 digits
-    }}
-    helperText="Enter a valid 10-digit contact number"
-  />
-</Grid>
-
-                </Grid>
-
-                <Grid container spacing={3} sx={{ marginY: '10px' }}>
-                  <Grid item xs={12} sm={12} md={6} lg={4}>
-                    <TextField
-                      id="driveRegards"
-                      name='driveRegards'
-                      fullWidth
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">Regards</InputAdornment>,
+                      onChange={(e) => {
+                        if (/^\d{0,10}$/.test(e.target.value)) {
+                          handleInput(e);
+                        }
                       }}
+                      inputProps={{ maxLength: 10 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      id="driveRegards"
+                      label="Regards/Contact Person"
                       value={data.driveRegards}
                       onChange={handleInput}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={12} md={6} lg={4}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setData({ ...data, driveUploadImage: e.target.files[0] })}
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={6} md={6} lg={2}>
-                    <Button variant='contained' type='reset' color='error' fullWidth size='large' sx={{ margin: '3px' }} onClick={resetInput}>Reset</Button>
-                  </Grid>
-                  <Grid item xs={6} sm={6} md={6} lg={2}>
-                    <Button variant='contained' type='submit' color='success' fullWidth size='large' sx={{ margin: '3px' }}>Create</Button>
-                  </Grid>
                 </Grid>
-              </Box>
-            </Box>
 
-          </Grid>
+                {/* Form Actions */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleClose}
+                    sx={{ mr: 2 }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    sx={{ bgcolor: '#5c6bc0', '&:hover': { bgcolor: '#3949ab' } }}
+                  >
+                    {editingDrive ? 'Update Drive' : 'Create Drive'}
+                  </Button>
+                </Box>
+              </Box>
+            </Paper>
+          </Container>
         </Dialog>
 
-        {/* Drive table section */}
-        <Grid item xs={12} sm={11} md={12} lg={12}>
-
-          <CssBaseline />
-          <Box
-            sx={{
-              padding: '20px'
-            }}
-            component={Paper}
-          >
-
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-
-              }}>
-              <Box>
-
-                <Typography component="h1" variant="h5" >
-                  Drive List
-                </Typography>
-              </Box>
-              <Box>
-                <Button variant='text' onClick={handleClickOpen}>+ Add Drive</Button>
-              </Box>
-
+        {/* Drives Table Section */}
+        <Grid item xs={12}>
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 3
+            }}>
+              <Typography variant="h5" sx={{ color: '#5c6bc0', fontWeight: 'bold' }}>
+                Current Drives
+              </Typography>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={handleClickOpen}
+                sx={{ bgcolor: '#5c6bc0', '&:hover': { bgcolor: '#3949ab' } }}
+              >
+                New Drive
+              </Button>
             </Box>
 
-            <Divider sx={{ marginY: '15px' }} />
+            <Divider sx={{ mb: 3 }} />
 
             <TableContainer>
-              <Table sx={{ minWidth: 450 }} size="medium">
+              <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell><b>Title</b></TableCell>
-                    <TableCell align='left'><b>Company Name</b></TableCell>
-                    <TableCell align='left'><b>Last Date</b></TableCell>
-                    <TableCell><b>Manage</b></TableCell>
-                    <TableCell><b>Created At</b></TableCell>
+                    <StyledTableCell>Title</StyledTableCell>
+                    <StyledTableCell>Company</StyledTableCell>
+                    <StyledTableCell>Last Date</StyledTableCell>
+                    <StyledTableCell>Created On</StyledTableCell>
+                    <StyledTableCell align="center">Actions</StyledTableCell>
                   </TableRow>
                 </TableHead>
-
                 <TableBody>
-                  {row.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                    >
-                      <TableCell component="th" scope="row">
-                        {row.driveTitle}
-                      </TableCell>
-
-                      <TableCell component="th" scope="row">
-                        {row.driveCompanyName}
-                      </TableCell >
-
-                      <TableCell component="th" scope="row">
-                        {row.driveLastDate}
-                      </TableCell >
-
-                      <TableCell component="th" scope="row">
-                        {row.createDate || row.date}
-                      </TableCell >
-
-                      <TableCell component="th" scope="row">
-                        <IconButton color="error" onClick={() => handleDelete(row.id)}>
+                  {row.map((drive) => (
+                    <StyledTableRow key={drive.id}>
+                      <TableCell>{drive.driveTitle}</TableCell>
+                      <TableCell>{drive.driveCompanyName}</TableCell>
+                      <TableCell>{drive.driveLastDate}</TableCell>
+                      <TableCell>{drive.createDate}</TableCell>
+                      <TableCell align="center">
+                        <IconButton 
+                          color="error" 
+                          onClick={() => handleDelete(drive.id)}
+                          sx={{ '&:hover': { bgcolor: 'rgba(255, 0, 0, 0.1)' } }}
+                        >
                           <DeleteOutlinedIcon />
                         </IconButton>
-                        <Button variant='text' ><EditOutlinedIcon /></Button>
-                      </TableCell >
-
-                    </TableRow>
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleEdit(drive)}
+                          sx={{ '&:hover': { bgcolor: 'rgba(0, 0, 255, 0.1)' } }}
+                        >
+                          <EditOutlinedIcon />
+                        </IconButton>
+                      </TableCell>
+                    </StyledTableRow>
                   ))}
-
                 </TableBody>
               </Table>
             </TableContainer>
-          </Box>
+          </Paper>
         </Grid>
-
       </Grid>
-      <ToastContainer />
-    </>
-  )
-}
 
-export default ManageDrives;
+      <ToastContainer 
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </Box>
+  );
+};
+
+export default ManageDrives;

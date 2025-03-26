@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { styled, useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import MuiDrawer from '@mui/material/Drawer';
@@ -16,26 +16,22 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import InboxIcon from '@mui/icons-material/MoveToInbox';
-import MailIcon from '@mui/icons-material/Mail';
-import { Paper, Tooltip } from '@mui/material';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Paper, Tooltip, Avatar } from '@mui/material';
+import { Link, useNavigate } from 'react-router-dom';
 // icons 
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import PermContactCalendarOutlinedIcon from '@mui/icons-material/PermContactCalendarOutlined';
 import AnnouncementOutlinedIcon from '@mui/icons-material/AnnouncementOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
+// Components
 import PtoManage from './Pages/PtoManage';
 import ManageDrives from '../CommonPages/ManageDrives';
 import Info from './Pages/Info';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
 import StudentsNew from '../CommonPages/StudentsNew';
-
-
 
 const drawerWidth = 240;
 
@@ -46,6 +42,8 @@ const openedMixin = (theme) => ({
     duration: theme.transitions.duration.enteringScreen,
   }),
   overflowX: 'hidden',
+  backgroundColor: '#5c6bc0',
+  color: 'white',
 });
 
 const closedMixin = (theme) => ({
@@ -55,6 +53,8 @@ const closedMixin = (theme) => ({
   }),
   overflowX: 'hidden',
   width: `calc(${theme.spacing(7)} + 1px)`,
+  backgroundColor: '#5c6bc0',
+  color: 'white',
   [theme.breakpoints.up('sm')]: {
     width: `calc(${theme.spacing(8)} + 1px)`,
   },
@@ -65,7 +65,6 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   alignItems: 'center',
   justifyContent: 'flex-end',
   padding: theme.spacing(0, 1),
-  // necessary for content to be below app bar
   ...theme.mixins.toolbar,
 }));
 
@@ -77,6 +76,8 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
+  backgroundColor: '#5c6bc0',
+  color: 'white',
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -104,45 +105,33 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
   }),
 );
 
-
-
 export default function AdminDashboard() {
   const theme = useTheme();
-  const [open, setOpen] = React.useState(false);
-
-  // for navigation 
+  const [open, setOpen] = useState(false);
+  const [component, setComponent] = useState('ManageDrives');
+  const [user, setUser] = useState({});
   const navigate = useNavigate();
 
-  const singOut = () =>{
-    sessionStorage.clear()
-    navigate('/')
-  }
+  const signOut = () => {
+    sessionStorage.clear();
+    navigate('/');
+  };
 
-
-    // fatch data
-    const [user,setUser] = useState({})
-    console.log(user)
-    const userUID = sessionStorage.getItem("uid")
-    console.log(userUID);
-  
-    const fatchData = async () => {
+  const fetchData = async () => {
+    const userUID = sessionStorage.getItem("uid");
+    if (userUID) {
       const docRef = doc(db, "users", userUID);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        const userData = docSnap.data();
-        setUser(userData) 
-        
-      } else {
-        // doc.data() will be undefined in this case
-        console.log("No such document!");
+        setUser(docSnap.data());
       }
     }
-  
-    useEffect(()=>{
-      fatchData()
-    },[])
+  };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -152,15 +141,10 @@ export default function AdminDashboard() {
     setOpen(false);
   };
 
-
-
-  const [component, setComponent] = useState('ManageDrives')
-
-
   return (
-    <Box sx={{ display: 'flex' ,color:'#555555',fontSize:'20px'}}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', background: 'linear-gradient(135deg, #e0f7fa, #bbdefb, #d1c4e9)' }}>
       <CssBaseline />
-      <AppBar position="fixed" open={open} sx={{backgroundColor:'#D9E4DD',color:'#555555'}}>
+      <AppBar position="fixed" open={open}>
         <Toolbar>
           <IconButton
             color="inherit"
@@ -175,145 +159,171 @@ export default function AdminDashboard() {
             <MenuIcon />
           </IconButton>
 
-          <Box sx={{display: 'flex', flexDirection: 'row', justifyContent: 'space-between' , alignItems: 'center' , width:'100%'}}> 
-
-
-          <Typography variant="h6" noWrap component="div">
-            Admin 
-          </Typography>
-          <Tooltip title="Logout">
-            <IconButton onClick={singOut}>
-               <PowerSettingsNewIcon  sx={{color:'#555555'}}/>
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            width: '100%' 
+          }}>
+            <Typography variant="h6" noWrap component="div">
+              Admin Dashboard
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="subtitle1">
+                {user.FullName || 'Admin'}
+              </Typography>
+              <Tooltip title="Logout">
+                <IconButton onClick={signOut} color="inherit">
+                  <PowerSettingsNewIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
-
-
         </Toolbar>
       </AppBar>
 
-
       <Drawer variant="permanent" open={open}>
         <DrawerHeader>
-          <IconButton onClick={handleDrawerClose}>
+          <IconButton onClick={handleDrawerClose} sx={{ color: 'white' }}>
             {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
         </DrawerHeader>
-        <Divider />
+        <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }} />
 
         <List>
-
-
-          {/* drive info */}
-          <ListItem>
-          <ListItemButton
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              sx={{
+                minHeight: 48,
+                justifyContent: open ? 'initial' : 'center',
+                px: 2.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+              onClick={() => setComponent('ManageDrives')}
+            >
+              <ListItemIcon
                 sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
+                  minWidth: 0,
+                  mr: open ? 3 : 'auto',
+                  justifyContent: 'center',
+                  color: 'white',
                 }}
-                 onClick={() => setComponent('ManageDrives')}
               >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* drive icon */}
-                  <AnnouncementOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='Drives' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
+                <AnnouncementOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Drives" sx={{ opacity: open ? 1 : 0, color: 'white' }} />
+            </ListItemButton>
           </ListItem>
 
-          {/* PTO manage info */}
-          <ListItem>
-          <ListItemButton
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              sx={{
+                minHeight: 48,
+                justifyContent: open ? 'initial' : 'center',
+                px: 2.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+              onClick={() => setComponent('PtoManage')}
+            >
+              <ListItemIcon
                 sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
+                  minWidth: 0,
+                  mr: open ? 3 : 'auto',
+                  justifyContent: 'center',
+                  color: 'white',
                 }}
-                 onClick={() => setComponent('PtoManage')}
               >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* PTOS icon */}
-                  <BadgeOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='PTOs' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
+                <BadgeOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="PTOs" sx={{ opacity: open ? 1 : 0, color: 'white' }} />
+            </ListItemButton>
           </ListItem>
 
-          {/* students  info */}
-          <ListItem>
-          <ListItemButton
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              sx={{
+                minHeight: 48,
+                justifyContent: open ? 'initial' : 'center',
+                px: 2.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+              onClick={() => setComponent('Students')}
+            >
+              <ListItemIcon
                 sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
+                  minWidth: 0,
+                  mr: open ? 3 : 'auto',
+                  justifyContent: 'center',
+                  color: 'white',
                 }}
-                 onClick={() => setComponent('Students')}
               >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* student icon */}
-                  <PermContactCalendarOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='Students' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
+                <PermContactCalendarOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Students" sx={{ opacity: open ? 1 : 0, color: 'white' }} />
+            </ListItemButton>
           </ListItem>
 
-          <Divider />
-          {/* info list  info */}
-          <ListItem>
-          <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-                 onClick={() => setComponent('Info')}
-              >
-                
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* drive icon */}
-                  <ManageAccountsOutlinedIcon/>
-                </ListItemIcon>
-                <ListItemText primary='Profile' sx={{ opacity: open ? 1 : 0 }} />
-          </ListItemButton>
-          </ListItem>
+          <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }} />
 
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              sx={{
+                minHeight: 48,
+                justifyContent: open ? 'initial' : 'center',
+                px: 2.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+              onClick={() => setComponent('Info')}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  mr: open ? 3 : 'auto',
+                  justifyContent: 'center',
+                  color: 'white',
+                }}
+              >
+                <ManageAccountsOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Profile" sx={{ opacity: open ? 1 : 0, color: 'white' }} />
+            </ListItemButton>
+          </ListItem>
         </List>
-        <Divider />
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <DrawerHeader />
 
-        {
-          component === 'ManageDrives' ? <ManageDrives />  : component === 'PtoManage' ? <PtoManage />  : component === 'Students' ? <StudentsNew />  : component === 'Info' ? <Info user={{...user}}/>  : ""
-        }
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          p: 3,
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          borderRadius: 2,
+          margin: 2,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <DrawerHeader />
+        <Paper 
+          sx={{ 
+            p: 3,
+            borderRadius: 2,
+            minHeight: '80vh',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+          }}
+        >
+          {component === 'ManageDrives' && <ManageDrives />}
+          {component === 'PtoManage' && <PtoManage />}
+          {component === 'Students' && <StudentsNew />}
+          {component === 'Info' && <Info user={user} />}
+        </Paper>
       </Box>
     </Box>
   );

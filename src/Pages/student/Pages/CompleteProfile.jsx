@@ -26,7 +26,7 @@ const CompleteProfile = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [formData, setFormData] = useState({
-    enrollmentNumber: "", // Enrollment Number field
+    enrollmentNumber: "",
     firstName: "",
     lastName: "",
     dob: "",
@@ -57,25 +57,92 @@ const CompleteProfile = () => {
     setErrors({ ...errors, [e.target.name]: "" });
   };
 
+  // Custom validation functions
+  const validateDOB = (dob) => {
+    if (!dob) return "Date of Birth is required";
+    const birthYear = new Date(dob).getFullYear();
+    if (birthYear < 2004 || birthYear > 2006) {
+      return "Birth year must be between 2004 and 2006";
+    }
+    return "";
+  };
+
+  const validatePercentage = (percentage) => {
+    if (!percentage) return "Percentage is required";
+    const percent = parseFloat(percentage);
+    if (isNaN(percent) || percent < 0 || percent > 100) {
+      return "Percentage must be between 0 and 100";
+    }
+    return "";
+  };
+
+  const validatePassingYear = (year) => {
+    if (!year) return "Passing Year is required";
+    const currentYear = new Date().getFullYear();
+    if (isNaN(year) || year.length !== 4 || year < 2000 || year > currentYear + 5) {
+      return `Please enter a valid year between 2000 and ${currentYear + 5}`;
+    }
+    return "";
+  };
+
+  const validateCGPA = (cgpa) => {
+    if (!cgpa) return "CGPA is required";
+    const cgpaValue = parseFloat(cgpa);
+    if (isNaN(cgpaValue) || cgpaValue < 0 || cgpaValue > 10) {
+      return "CGPA must be between 0 and 10";
+    }
+    return "";
+  };
+
+  const validateMobile = (mobile) => {
+    if (!mobile) return "Mobile number is required";
+    if (!/^\d{10}$/.test(mobile)) {
+      return "Mobile number must be 10 digits";
+    }
+    return "";
+  };
+
   const validateStep = () => {
     const newErrors = {};
+    
     if (activeStep === 1) {
       if (!formData.firstName) newErrors.firstName = "First Name is required";
       if (!formData.lastName) newErrors.lastName = "Last Name is required";
-      if (!formData.dob) newErrors.dob = "Date of Birth is required";
+      
+      const dobError = validateDOB(formData.dob);
+      if (dobError) newErrors.dob = dobError;
+      
       if (!formData.address) newErrors.address = "Address is required";
       if (!formData.city) newErrors.city = "City is required";
+      
+      const mobileError = validateMobile(formData.mobile);
+      if (mobileError) newErrors.mobile = mobileError;
+      
     } else if (activeStep === 2) {
       if (!formData.collegeName) newErrors.collegeName = "College Name is required";
-      if (!formData.passingYear) newErrors.passingYear = "Passing Year is required";
-      if (!formData.percentage) newErrors.percentage = "Percentage is required";
+      
+      const passingYearError = validatePassingYear(formData.passingYear);
+      if (passingYearError) newErrors.passingYear = passingYearError;
+      
+      const percentageError = validatePercentage(formData.percentage);
+      if (percentageError) newErrors.percentage = percentageError;
+      
     } else if (activeStep === 3) {
       if (!formData.previousCourse) newErrors.previousCourse = "Previous Course is required";
       if (!formData.previousCollege) newErrors.previousCollege = "Previous College is required";
-      if (!formData.cgpa) newErrors.cgpa = "CGPA is required";
+      
+      const cgpaError = validateCGPA(formData.cgpa);
+      if (cgpaError) newErrors.cgpa = cgpaError;
+      
       if (!formData.startDate) newErrors.startDate = "Start Date is required";
       if (!formData.endDate) newErrors.endDate = "End Date is required";
+      
+      // Validate end date is after start date
+      if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+        newErrors.endDate = "End date must be after start date";
+      }
     }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -93,7 +160,6 @@ const CompleteProfile = () => {
   };
 
   const handleSubmit = async () => {
-    console.log("Enrollment Number:", formData.enrollmentNumber);
     if (validateStep()) {
       try {
         const uid = auth.currentUser.uid;
@@ -101,7 +167,7 @@ const CompleteProfile = () => {
           doc(db, "users", uid),
           {
             ...formData,
-            enrollmentNumber: formData.enrollmentNumber || "",
+            enrollmentNumber: formData.erNo || "",
             userType: "student",
             profileCompleted: true,
             timestamp: serverTimestamp(),
@@ -111,7 +177,7 @@ const CompleteProfile = () => {
         setSnackbarMessage("Profile saved successfully! Please contact the admin for account activation.");
         setSnackbarSeverity("success");
         setSnackbarOpen(true);
-        setTimeout(() => navigate("/dashboard"), 3000);
+        setTimeout(() => navigate("/dash"), 3000);
       } catch (error) {
         console.error("Error saving profile: ", error);
         setSnackbarSeverity("error");
@@ -134,7 +200,7 @@ const CompleteProfile = () => {
         ...prevData,
         firstName: storedFirstName,
         lastName: storedLastName,
-        enrollmentNumber: storedErNo,
+        erNo: storedErNo,
         email: storedEmail,
       }));
     } else {
@@ -147,7 +213,7 @@ const CompleteProfile = () => {
               ...prevData,
               firstName: userData.firstName || "",
               lastName: userData.lastName || "",
-              enrollmentNumber: userData.enrollmentNumber || "",
+              enrollmentNumber: userData.erNo || "",
               email: userData.email || "",
             }));
           }
@@ -170,13 +236,13 @@ const CompleteProfile = () => {
           {activeStep === 0 ? (
             <Box textAlign="center">
               <Typography variant="h3" gutterBottom>
-                Hey,
+                Hey {formData.firstName}!,
               </Typography>
               <Typography variant="h4" color="primary" fontWeight="bold">
                 You are most welcome to Placement Portal
               </Typography>
               <Typography variant="h6" sx={{ mt: 2 }}>
-                "Most of you desire to be great, but do you know that you don’t have to be great to start, 
+                "Most of you desire to be great, but do you know that you don't have to be great to start, 
                 but you have to start to be great. Therefore, start from somewhere no matter how small."
               </Typography>
               <Typography sx={{ mt: 3, color: "gray" }}>
@@ -202,10 +268,10 @@ const CompleteProfile = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
-                    name="enrollmentNumber"
+                    name="erNo"
                     label="Enrollment Number"
                     fullWidth
-                    value={formData.enrollmentNumber}
+                    value={formData.erNo}
                     onChange={handleInputChange}
                     disabled
                   />
@@ -217,7 +283,7 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.firstName}
                     helperText={errors.firstName}
-                    required
+                  //  required
                     disabled
                   />
                 </Grid>
@@ -230,11 +296,11 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.lastName}
                     helperText={errors.lastName}
-                    required
+                   // required
                     disabled
                   />
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     name="dob"
                     label="Date of Birth"
@@ -244,8 +310,25 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.dob}
                     helperText={errors.dob}
-                    required
+                   // required
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{
+                      max: "2005-12-31",
+                      min: "2004-01-01"
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    name="mobile"
+                    label="Mobile Number"
+                    fullWidth
+                    value={formData.mobile}
+                    onChange={handleInputChange}
+                    error={!!errors.mobile}
+                    helperText={errors.mobile}
+                   // required
+                    inputProps={{ maxLength: 10 }}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -257,7 +340,7 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.address}
                     helperText={errors.address}
-                    required
+                  //  required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -269,7 +352,7 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.city}
                     helperText={errors.city}
-                    required
+                 //   required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -309,7 +392,7 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.collegeName}
                     helperText={errors.collegeName}
-                    required
+                    //required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -321,7 +404,8 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.passingYear}
                     helperText={errors.passingYear}
-                    required
+                    //required
+                    inputProps={{ maxLength: 4 }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -333,7 +417,8 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.percentage}
                     helperText={errors.percentage}
-                    required
+                   // required
+                    inputProps={{ maxLength: 5 }}
                   />
                 </Grid>
               </Grid>
@@ -350,7 +435,7 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.previousCourse}
                     helperText={errors.previousCourse}
-                    required
+                  //  required
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -362,19 +447,20 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.previousCollege}
                     helperText={errors.previousCollege}
-                    required
+                  //  required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     name="cgpa"
-                    label="CGPA"
+                    label="CGPA (0-10)"
                     fullWidth
                     value={formData.cgpa}
                     onChange={handleInputChange}
                     error={!!errors.cgpa}
                     helperText={errors.cgpa}
-                    required
+                  //  required
+                    inputProps={{ maxLength: 4, step: "0.01" }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -387,8 +473,12 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.startDate}
                     helperText={errors.startDate}
-                    required
+                  //  required
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{
+                      max: "2005-12-31",
+                      min: "2004-01-01"
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -401,8 +491,13 @@ const CompleteProfile = () => {
                     onChange={handleInputChange}
                     error={!!errors.endDate}
                     helperText={errors.endDate}
-                    required
-                    InputLabelProps={{ shrink: true }}
+                  //  required
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{
+                    max: "2021-12-31",
+                    min: "2020-01-01"
+                  }} 
+                   
                   />
                 </Grid>
               </Grid>
@@ -411,7 +506,7 @@ const CompleteProfile = () => {
             {activeStep === 4 && (
               <Box textAlign="center">
                 <Typography variant="h5" fontWeight="bold" color="primary">
-                   All steps are done!
+                  All steps are done!
                 </Typography>
                 <Typography sx={{ mt: 2 }}>
                   Now, you need to activate your account by contacting the admin or the placement department.
@@ -422,9 +517,13 @@ const CompleteProfile = () => {
             <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
               {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
               {activeStep < steps.length - 1 ? (
-                <Button variant="contained" onClick={handleNext}>Next</Button>
+                <Button variant="contained" onClick={handleNext}>
+                  Next
+                </Button>
               ) : (
-                <Button variant="contained" onClick={handleSubmit}>Submit</Button>
+                <Button variant="contained" onClick={handleSubmit}>
+                  Submit
+                </Button>
               )}
             </Box>
           </Box>

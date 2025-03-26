@@ -29,6 +29,7 @@
   import { createUserWithEmailAndPassword } from "firebase/auth";
   import { collection, query, where, getDocs } from "firebase/firestore";
   import { motion } from "framer-motion";
+import { PhotoSizeSelectLarge } from "@mui/icons-material";
 
   const SignUp = () => {
     const [data, setData] = useState({});
@@ -55,16 +56,10 @@
     const handleSubmit = async (e) => {
       e.preventDefault();
       setLoading(true);
-    
-      // Form validation
-      if (!data.firstName?.trim()) {
-        notifyError("First name is required");
-        setLoading(false);
-        return;
-      }
+
       
       if (!data.lastName?.trim()) {
-        notifyError("Last name is required");
+        notifyError("Full name is required");
         setLoading(false);
         return;
       }
@@ -242,7 +237,7 @@
                       whileHover={{ scale: 1.05, rotate: 5 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
-                      {/* <Avatar 
+                      { <Avatar 
                         sx={{ 
                           m: "auto", 
                           bgcolor: '#fff',
@@ -253,7 +248,7 @@
                         }}
                       >
                         <PersonAddOutlinedIcon sx={{ color: "#5c6bc0", fontSize: 35 }} />
-                      </Avatar> */}
+                      </Avatar> }
                     </motion.div>
                     
                     <motion.div variants={itemVariants}>
@@ -265,12 +260,12 @@
                   </Box>
                   <CardContent sx={{ padding: 4, bgcolor: "#fff" }}>
                     <Box component="form" onSubmit={handleSubmit}>
-                      <motion.div variants={itemVariants}>
+                     { <motion.div variants={itemVariants}>
                         <TextField
                           variant="outlined"
                           margin="normal"
                         
-                          fullWidth
+                           fullWidth
                           id="firstName"
                           label="First Name"
                           name="firstName"
@@ -293,7 +288,7 @@
                             "& .MuiInputLabel-root.Mui-focused": { color: "#5c6bc0" },
                           }}
                         />
-                      </motion.div>
+                      </motion.div> }
                       
                       <motion.div variants={itemVariants}>
                         <TextField
@@ -302,7 +297,7 @@
                           
                           fullWidth
                           id="lastName"
-                          label="Last Name"
+                          label="LastName"
                           name="lastName"
                           onChange={handleInput}
                           InputProps={{ 
@@ -492,7 +487,8 @@
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexDirection: 'column',
-                  padding: '2rem',
+                  padding: '4rem',
+                
                 }}
               >
                 <Box
@@ -502,7 +498,7 @@
                   x={{
                     maxWidth: '100vh',
                     maxHeight: '100vh',
-                    objectFit: 'contain',
+                    //objectFit: 'contain',
                     borderRadius: 4,
                     boxShadow: '0 8px 40px rgba(0, 0, 0, 0.2)',
                   }}
