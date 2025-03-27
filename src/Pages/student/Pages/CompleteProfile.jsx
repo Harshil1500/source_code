@@ -16,9 +16,26 @@ import {
   CardContent,
   Snackbar,
   Alert,
+  Paper,
+  CssBaseline,
+  ThemeProvider,
+  createTheme
 } from "@mui/material";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
+
+const theme = createTheme({
+  palette: {
+    primary: { main: '#1976d2' },
+    secondary: { main: '#dc004e' },
+    background: { default: '#f5f7fa', paper: '#ffffff' },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h4: { fontWeight: 600 },
+    h5: { fontWeight: 500 },
+  },
+});
 
 const steps = ["Welcome", "Personal Details", "Academic Details", "Education History", "Finish"];
 
@@ -42,8 +59,8 @@ const CompleteProfile = () => {
     previousCourse: "",
     previousCollege: "",
     cgpa: "",
-    startDate: "",
-    endDate: "",
+    startYear: "",
+    endYear: "",
   });
   const [errors, setErrors] = useState({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -53,14 +70,19 @@ const CompleteProfile = () => {
   const navigate = useNavigate();
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: "" });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear error when user types
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" });
+    }
   };
 
-  // Custom validation functions
+  // Validation functions
   const validateDOB = (dob) => {
     if (!dob) return "Date of Birth is required";
-    const birthYear = new Date(dob).getFullYear();
+    const birthDate = new Date(dob);
+    const birthYear = birthDate.getFullYear();
     if (birthYear < 2004 || birthYear > 2006) {
       return "Birth year must be between 2004 and 2006";
     }
@@ -79,7 +101,9 @@ const CompleteProfile = () => {
   const validatePassingYear = (year) => {
     if (!year) return "Passing Year is required";
     const currentYear = new Date().getFullYear();
-    if (isNaN(year) || year.length !== 4 || year < 2000 || year > currentYear + 5) {
+    const yearNum = parseInt(year);
+    if (isNaN(yearNum)) return "Please enter a valid year";
+    if (year.length !== 4 || yearNum < 2000 || yearNum > currentYear + 5) {
       return `Please enter a valid year between 2000 and ${currentYear + 5}`;
     }
     return "";
@@ -88,7 +112,8 @@ const CompleteProfile = () => {
   const validateCGPA = (cgpa) => {
     if (!cgpa) return "CGPA is required";
     const cgpaValue = parseFloat(cgpa);
-    if (isNaN(cgpaValue) || cgpaValue < 0 || cgpaValue > 10) {
+    if (isNaN(cgpaValue) )return "Please enter a valid number";
+    if (cgpaValue < 0 || cgpaValue > 10) {
       return "CGPA must be between 0 and 10";
     }
     return "";
@@ -102,24 +127,35 @@ const CompleteProfile = () => {
     return "";
   };
 
+  const validateYearRange = (startYear, endYear) => {
+    if (startYear && endYear) {
+      const start = parseInt(startYear);
+      const end = parseInt(endYear);
+      if (end < start) {
+        return "End year must be after start year";
+      }
+    }
+    return "";
+  };
+
   const validateStep = () => {
     const newErrors = {};
     
     if (activeStep === 1) {
-      if (!formData.firstName) newErrors.firstName = "First Name is required";
-      if (!formData.lastName) newErrors.lastName = "Last Name is required";
+      if (!formData.firstName.trim()) newErrors.firstName = "First Name is required";
+      if (!formData.lastName.trim()) newErrors.lastName = "Last Name is required";
       
       const dobError = validateDOB(formData.dob);
       if (dobError) newErrors.dob = dobError;
       
-      if (!formData.address) newErrors.address = "Address is required";
-      if (!formData.city) newErrors.city = "City is required";
+      if (!formData.address.trim()) newErrors.address = "Address is required";
+      if (!formData.city.trim()) newErrors.city = "City is required";
       
       const mobileError = validateMobile(formData.mobile);
       if (mobileError) newErrors.mobile = mobileError;
       
     } else if (activeStep === 2) {
-      if (!formData.collegeName) newErrors.collegeName = "College Name is required";
+      if (!formData.collegeName.trim()) newErrors.collegeName = "College Name is required";
       
       const passingYearError = validatePassingYear(formData.passingYear);
       if (passingYearError) newErrors.passingYear = passingYearError;
@@ -128,18 +164,15 @@ const CompleteProfile = () => {
       if (percentageError) newErrors.percentage = percentageError;
       
     } else if (activeStep === 3) {
-      if (!formData.previousCourse) newErrors.previousCourse = "Previous Course is required";
-      if (!formData.previousCollege) newErrors.previousCollege = "Previous College is required";
+      // Only validate if fields are filled (optional fields)
+      if (formData.cgpa) {
+        const cgpaError = validateCGPA(formData.cgpa);
+        if (cgpaError) newErrors.cgpa = cgpaError;
+      }
       
-      const cgpaError = validateCGPA(formData.cgpa);
-      if (cgpaError) newErrors.cgpa = cgpaError;
-      
-      if (!formData.startDate) newErrors.startDate = "Start Date is required";
-      if (!formData.endDate) newErrors.endDate = "End Date is required";
-      
-      // Validate end date is after start date
-      if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-        newErrors.endDate = "End date must be after start date";
+      if (formData.startYear || formData.endYear) {
+        const yearRangeError = validateYearRange(formData.startYear, formData.endYear);
+        if (yearRangeError) newErrors.endYear = yearRangeError;
       }
     }
     
@@ -167,7 +200,7 @@ const CompleteProfile = () => {
           doc(db, "users", uid),
           {
             ...formData,
-            enrollmentNumber: formData.erNo || "",
+            enrollmentNumber: formData.enrollmentNumber || "",
             userType: "student",
             profileCompleted: true,
             timestamp: serverTimestamp(),
@@ -190,39 +223,26 @@ const CompleteProfile = () => {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const storedFirstName = sessionStorage.getItem("firstName");
-    const storedLastName = sessionStorage.getItem("lastName");
-    const storedErNo = sessionStorage.getItem("erNo");
-    const storedEmail = sessionStorage.getItem("email");
-
-    if (storedFirstName && storedLastName && storedErNo && storedEmail) {
-      setFormData((prevData) => ({
-        ...prevData,
-        firstName: storedFirstName,
-        lastName: storedLastName,
-        erNo: storedErNo,
-        email: storedEmail,
-      }));
-    } else {
-      const fetchUserData = async () => {
-        try {
-          const userDoc = await getDoc(doc(db, "users", uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setFormData((prevData) => ({
-              ...prevData,
-              firstName: userData.firstName || "",
-              lastName: userData.lastName || "",
-              enrollmentNumber: userData.erNo || "",
-              email: userData.email || "",
-            }));
-          }
-        } catch (error) {
-          console.error("Error fetching user data: ", error);
+    
+    const fetchUserData = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setFormData((prevData) => ({
+            ...prevData,
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            enrollmentNumber: userData.enrollmentNumber || "",
+            email: userData.email || "",
+          }));
         }
-      };
-      fetchUserData();
-    }
+      } catch (error) {
+        console.error("Error fetching user data: ", error);
+      }
+    };
+    
+    fetchUserData();
   }, []);
 
   const handleSnackbarClose = () => {
@@ -230,312 +250,335 @@ const CompleteProfile = () => {
   };
 
   return (
-    <Container maxWidth="md">
-      <Card sx={{ mt: 5, p: 4, borderRadius: 3, boxShadow: 3 }}>
-        <CardContent>
-          {activeStep === 0 ? (
-            <Box textAlign="center">
-              <Typography variant="h3" gutterBottom>
-                Hey {formData.firstName}!,
-              </Typography>
-              <Typography variant="h4" color="primary" fontWeight="bold">
-                You are most welcome to Placement Portal
-              </Typography>
-              <Typography variant="h6" sx={{ mt: 2 }}>
-                "Most of you desire to be great, but do you know that you don't have to be great to start, 
-                but you have to start to be great. Therefore, start from somewhere no matter how small."
-              </Typography>
-              <Typography sx={{ mt: 3, color: "gray" }}>
-                Here, you need to fill out your details once, and then you can proceed with the next steps.
-                Click on "Next" to continue.
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
-                {steps.map((label) => (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-              <LinearProgress variant="determinate" value={progress} sx={{ mt: 2, mb: 3 }} />
-            </>
-          )}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', py: 6, px: 2 }}>
+        <Container maxWidth="md">
+          <Paper elevation={6} sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
+            <Card sx={{ border: 'none' }}>
+              <CardContent sx={{ p: 4 }}>
+                {activeStep === 0 ? (
+                  <Box textAlign="center" sx={{ py: 4 }}>
+                    <Typography variant="h3" gutterBottom sx={{ color: 'primary.main', mb: 3 }}>
+                      Hey {formData.firstName}!
+                    </Typography>
+                    <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>
+                      Welcome to Placement Portal
+                    </Typography>
+                    <Box sx={{ maxWidth: 700, mx: 'auto', p: 3, backgroundColor: 'rgba(25, 118, 210, 0.05)', borderRadius: 2, mb: 4 }}>
+                      <Typography variant="h6" fontStyle="italic" sx={{ mb: 2 }}>
+                        "Most of you desire to be great, but do you know that you don't have to be great to start, 
+                        but you have to start to be great. Therefore, start from somewhere no matter how small."
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ color: 'text.secondary' }}>
+                      Please complete your profile to access all features of the portal.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4, '& .MuiStepLabel-label': { fontWeight: 500 } }}>
+                      {steps.map((label) => (
+                        <Step key={label}>
+                          <StepLabel>{label}</StepLabel>
+                        </Step>
+                      ))}
+                    </Stepper>
+                    <LinearProgress
+                      variant="determinate"
+                      value={progress}
+                      sx={{
+                        height: 8,
+                        borderRadius: 4,
+                        mb: 4,
+                        backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                        '& .MuiLinearProgress-bar': { borderRadius: 4 }
+                      }}
+                    />
+                  </>
+                )}
 
-          <Box component="form" sx={{ mt: 3 }}>
-            {activeStep === 1 && (
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="erNo"
-                    label="Enrollment Number"
-                    fullWidth
-                    value={formData.erNo}
-                    onChange={handleInputChange}
-                    disabled
-                  />
-                  <TextField
-                    name="firstName"
-                    label="First Name"
-                    fullWidth
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    error={!!errors.firstName}
-                    helperText={errors.firstName}
-                  //  required
-                    disabled
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="lastName"
-                    label="Last Name"
-                    fullWidth
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    error={!!errors.lastName}
-                    helperText={errors.lastName}
-                   // required
-                    disabled
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="dob"
-                    label="Date of Birth"
-                    type="date"
-                    fullWidth
-                    value={formData.dob}
-                    onChange={handleInputChange}
-                    error={!!errors.dob}
-                    helperText={errors.dob}
-                   // required
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{
-                      max: "2005-12-31",
-                      min: "2004-01-01"
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="mobile"
-                    label="Mobile Number"
-                    fullWidth
-                    value={formData.mobile}
-                    onChange={handleInputChange}
-                    error={!!errors.mobile}
-                    helperText={errors.mobile}
-                   // required
-                    inputProps={{ maxLength: 10 }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="address"
-                    label="Address"
-                    fullWidth
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    error={!!errors.address}
-                    helperText={errors.address}
-                  //  required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="city"
-                    label="City"
-                    fullWidth
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    error={!!errors.city}
-                    helperText={errors.city}
-                 //   required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="linkedin"
-                    label="LinkedIn Profile"
-                    fullWidth
-                    value={formData.linkedin}
-                    onChange={handleInputChange}
-                  />
-                </Grid>
-              </Grid>
-            )}
+                <Box component="form" sx={{ mt: 2 }}>
+                  {/* Step 1: Personal Details */}
+                  {activeStep === 1 && (
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="enrollmentNumber"
+                          label="Enrollment Number"
+                          fullWidth
+                          value={formData.enrollmentNumber}
+                          onChange={handleInputChange}
+                          error={!!errors.enrollmentNumber}
+                          helperText={errors.enrollmentNumber}
+                          disabled
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="firstName"
+                          label="First Name *"
+                          fullWidth
+                          value={formData.firstName}
+                          onChange={handleInputChange}
+                          error={!!errors.firstName}
+                          helperText={errors.firstName}
+                          disabled
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="lastName"
+                          label="Last Name *"
+                          fullWidth
+                          value={formData.lastName}
+                          onChange={handleInputChange}
+                          error={!!errors.lastName}
+                          helperText={errors.lastName}
+                          disabled
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="dob"
+                          label="Date of Birth *"
+                          type="date"
+                          fullWidth
+                          value={formData.dob}
+                          onChange={handleInputChange}
+                          error={!!errors.dob}
+                          helperText={errors.dob}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{ max: "2005-12-31", min: "2004-01-01" }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="mobile"
+                          label="Mobile Number *"
+                          fullWidth
+                          value={formData.mobile}
+                          onChange={handleInputChange}
+                          error={!!errors.mobile}
+                          helperText={errors.mobile}
+                          inputProps={{ maxLength: 10 }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          name="address"
+                          label="Address *"
+                          fullWidth
+                          multiline
+                          rows={3}
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          error={!!errors.address}
+                          helperText={errors.address}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="city"
+                          label="City *"
+                          fullWidth
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          error={!!errors.city}
+                          helperText={errors.city}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="linkedin"
+                          label="LinkedIn Profile URL"
+                          fullWidth
+                          value={formData.linkedin}
+                          onChange={handleInputChange}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
 
-            {activeStep === 2 && (
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    select
-                    name="course"
-                    label="Course"
-                    fullWidth
-                    value={formData.course}
-                    onChange={handleInputChange}
-                  >
-                    <MenuItem value="BCA">BCA</MenuItem>
-                    <MenuItem value="BBA">BBA</MenuItem>
-                    <MenuItem value="B.Com">B.Com</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="collegeName"
-                    label="College Name"
-                    fullWidth
-                    value={formData.collegeName}
-                    onChange={handleInputChange}
-                    error={!!errors.collegeName}
-                    helperText={errors.collegeName}
-                    //required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="passingYear"
-                    label="Passing Year"
-                    fullWidth
-                    value={formData.passingYear}
-                    onChange={handleInputChange}
-                    error={!!errors.passingYear}
-                    helperText={errors.passingYear}
-                    //required
-                    inputProps={{ maxLength: 4 }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="percentage"
-                    label="Last Sem Percentage"
-                    fullWidth
-                    value={formData.percentage}
-                    onChange={handleInputChange}
-                    error={!!errors.percentage}
-                    helperText={errors.percentage}
-                   // required
-                    inputProps={{ maxLength: 5 }}
-                  />
-                </Grid>
-              </Grid>
-            )}
+                  {/* Step 2: Academic Details */}
+                  {activeStep === 2 && (
+                    <Grid container spacing={3}>
+                      <Grid item xs={12}>
+                        <TextField
+                          select
+                          name="course"
+                          label="Current Course *"
+                          fullWidth
+                          value={formData.course}
+                          onChange={handleInputChange}
+                          sx={{ mb: 2 }}
+                        >
+                          <MenuItem value="BCA">BCA</MenuItem>
+                          <MenuItem value="BBA">BBA</MenuItem>
+                          <MenuItem value="B.Com">B.Com</MenuItem>
+                        </TextField>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          name="collegeName"
+                          label="College Name *"
+                          fullWidth
+                          value={formData.collegeName}
+                          onChange={handleInputChange}
+                          error={!!errors.collegeName}
+                          helperText={errors.collegeName}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="passingYear"
+                          label="Passing Year *"
+                          fullWidth
+                          value={formData.passingYear}
+                          onChange={handleInputChange}
+                          error={!!errors.passingYear}
+                          helperText={errors.passingYear}
+                          inputProps={{ maxLength: 4 }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="percentage"
+                          label="Last Semester Percentage *"
+                          fullWidth
+                          value={formData.percentage}
+                          onChange={handleInputChange}
+                          error={!!errors.percentage}
+                          helperText={errors.percentage}
+                          inputProps={{ maxLength: 5 }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
 
-            {activeStep === 3 && (
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    name="previousCourse"
-                    label="Previous Course"
-                    fullWidth
-                    value={formData.previousCourse}
-                    onChange={handleInputChange}
-                    error={!!errors.previousCourse}
-                    helperText={errors.previousCourse}
-                  //  required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="previousCollege"
-                    label="Previous College Name"
-                    fullWidth
-                    value={formData.previousCollege}
-                    onChange={handleInputChange}
-                    error={!!errors.previousCollege}
-                    helperText={errors.previousCollege}
-                  //  required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="cgpa"
-                    label="CGPA (0-10)"
-                    fullWidth
-                    value={formData.cgpa}
-                    onChange={handleInputChange}
-                    error={!!errors.cgpa}
-                    helperText={errors.cgpa}
-                  //  required
-                    inputProps={{ maxLength: 4, step: "0.01" }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="startDate"
-                    label="Start Date"
-                    type="date"
-                    fullWidth
-                    value={formData.startDate}
-                    onChange={handleInputChange}
-                    error={!!errors.startDate}
-                    helperText={errors.startDate}
-                  //  required
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{
-                      max: "2005-12-31",
-                      min: "2004-01-01"
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    name="endDate"
-                    label="End Date"
-                    type="date"
-                    fullWidth
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    error={!!errors.endDate}
-                    helperText={errors.endDate}
-                  //  required
-                  InputLabelProps={{ shrink: true }}
-                  inputProps={{
-                    max: "2021-12-31",
-                    min: "2020-01-01"
-                  }} 
-                   
-                  />
-                </Grid>
-              </Grid>
-            )}
+                  {/* Step 3: Education History */}
+                  {activeStep === 3 && (
+                    <Grid container spacing={3}>
+                      <Grid item xs={12}>
+                        <TextField
+                          name="previousCourse"
+                          label="Previous Course (Optional)"
+                          fullWidth
+                          value={formData.previousCourse}
+                          onChange={handleInputChange}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          name="previousCollege"
+                          label="Previous College Name (Optional)"
+                          fullWidth
+                          value={formData.previousCollege}
+                          onChange={handleInputChange}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="cgpa"
+                          label="CGPA (0-10) (Optional)"
+                          fullWidth
+                          value={formData.cgpa}
+                          onChange={handleInputChange}
+                          error={!!errors.cgpa}
+                          helperText={errors.cgpa}
+                          inputProps={{ maxLength: 4, step: "0.01" }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="startYear"
+                          label="Start Year (Optional)"
+                          type="number"
+                          fullWidth
+                          value={formData.startYear}
+                          onChange={handleInputChange}
+                          inputProps={{ min: 2004, max: 2005 }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          name="endYear"
+                          label="End Year (Optional)"
+                          type="number"
+                          fullWidth
+                          value={formData.endYear}
+                          onChange={handleInputChange}
+                          error={!!errors.endYear}
+                          helperText={errors.endYear}
+                          inputProps={{ min: 2020, max: 2021 }}
+                          sx={{ mb: 2 }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
 
-            {activeStep === 4 && (
-              <Box textAlign="center">
-                <Typography variant="h5" fontWeight="bold" color="primary">
-                  All steps are done!
-                </Typography>
-                <Typography sx={{ mt: 2 }}>
-                  Now, you need to activate your account by contacting the admin or the placement department.
-                </Typography>
-              </Box>
-            )}
+                  {/* Step 4: Confirmation */}
+                  {activeStep === 4 && (
+                    <Box textAlign="center" sx={{ py: 4 }}>
+                      <Box sx={{ width: 100, height: 100, borderRadius: '50%', backgroundColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
+                        <Typography variant="h4" sx={{ color: 'white' }}>✓</Typography>
+                      </Box>
+                      <Typography variant="h5" fontWeight="bold" sx={{ mb: 2 }}>
+                        Profile Complete!
+                      </Typography>
+                      <Typography sx={{ color: 'text.secondary', maxWidth: 500, mx: 'auto' }}>
+                        Your profile has been successfully saved. Please contact the placement office
+                        for account activation and further instructions.
+                      </Typography>
+                    </Box>
+                  )}
 
-            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
-              {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
-              {activeStep < steps.length - 1 ? (
-                <Button variant="contained" onClick={handleNext}>
-                  Next
-                </Button>
-              ) : (
-                <Button variant="contained" onClick={handleSubmit}>
-                  Submit
-                </Button>
-              )}
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, pt: 3, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Button
+                      onClick={handleBack}
+                      disabled={activeStep === 0}
+                      sx={{ visibility: activeStep === 0 ? 'hidden' : 'visible' }}
+                    >
+                      Back
+                    </Button>
+                    {activeStep < steps.length - 1 ? (
+                      <Button variant="contained" onClick={handleNext} sx={{ px: 4, py: 1, borderRadius: 2, fontWeight: 'bold' }}>
+                        Continue
+                      </Button>
+                    ) : (
+                      <Button variant="contained" onClick={handleSubmit} sx={{ px: 4, py: 1, borderRadius: 2, fontWeight: 'bold' }}>
+                        Submit Profile
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Paper>
 
-      <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleSnackbarClose}>
-        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: "100%" }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-    </Container>
+          <Snackbar open={snackbarOpen} autoHideDuration={5000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+            <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }} elevation={6}>
+              {snackbarMessage}
+            </Alert>
+          </Snackbar>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 };
 

@@ -10,9 +10,11 @@ import {
   Avatar,
   LinearProgress,
   Alert,
-  Divider
+  Divider,
+  IconButton,
+  Tooltip
 } from "@mui/material";
-import { collection, doc, getDoc, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { db } from "../../../firebase";
 import { getAuth } from "firebase/auth";
@@ -20,7 +22,9 @@ import WorkIcon from '@mui/icons-material/Work';
 import EventIcon from '@mui/icons-material/Event';
 import PeopleIcon from '@mui/icons-material/People';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DownloadIcon from '@mui/icons-material/Download';
 import { teal, blue, orange, green } from '@mui/material/colors';
+import * as XLSX from 'xlsx';
 
 const Applied = () => {
   const auth = getAuth();
@@ -29,15 +33,43 @@ const Applied = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper function to format dates safely
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    
+    try {
+      // Handle Firebase Timestamp
+      if (date.seconds) {
+        return new Date(date.seconds * 1000).toLocaleDateString();
+      }
+      // Handle string dates
+      if (typeof date === 'string') {
+        return new Date(date).toLocaleDateString();
+      }
+      // Handle Date objects
+      if (date instanceof Date) {
+        return date.toLocaleDateString();
+      }
+      return 'N/A';
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
+  };
+
   const fetchDrives = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "drives"));
-      const driveList = querySnapshot.docs.map((doc) => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        formattedDate: doc.data().createDate ? 
-          new Date(doc.data().createDate.seconds * 1000).toLocaleDateString() : 'N/A'
-      }));
+      const driveList = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          ...data,
+          formattedDate: formatDate(data.createDate),
+          formattedLastDate: formatDate(data.driveLastDate),
+          formattedDriveDate: formatDate(data.driveDate)
+        };
+      });
       setAllDrives(driveList);
     } catch (error) {
       console.error("Error fetching drives:", error);
@@ -61,6 +93,27 @@ const Applied = () => {
     }
   };
 
+  const downloadReport = () => {
+    const reportData = filteredDrives.map(drive => ({
+      'Drive Title': drive.driveTitle || 'N/A',
+      'Company Name': drive.driveCompanyName || 'N/A',
+      'Application Date': drive.formattedDate,
+      'Start Date': drive.createDate,
+      'Last Date': drive.driveLastDate,
+      'Open Positions': drive.driveNoOpenings || 'N/A',
+     // 'Job Location': drive.driveLocation || 'N/A',
+      'Job Type': drive.driveTitle|| 'N/A',
+      'Salary Package': drive.driveSalary || 'N/A',
+    //  'Skills Required': drive.driveSkills?.join(', ') || 'N/A',
+      'Status': 'Applied'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(reportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Applied Drives");
+    XLSX.writeFile(wb, `Applied_Drives_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   useEffect(() => {
     const loadData = async () => {
       await fetchDrives();
@@ -77,15 +130,35 @@ const Applied = () => {
     );
   }
 
-  // Filter to only show applied drives
   const filteredDrives = allDrives.filter(drive => appliedDrives.includes(drive.id));
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
-        <WorkIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        My Applied Drives
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          <WorkIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+          My Applied Drives
+        </Typography>
+        
+        {filteredDrives.length > 0 && (
+          <Tooltip title="Download Report">
+            <Button 
+              variant="contained"
+              onClick={downloadReport}
+              startIcon={<DownloadIcon />}
+              sx={{ 
+                bgcolor: blue[500],
+                color: 'white',
+                '&:hover': {
+                  bgcolor: blue[600]
+                }
+              }}
+            >
+              Download Report
+            </Button>
+          </Tooltip>
+        )}
+      </Box>
 
       {error && (
         <Box sx={{ mb: 3 }}>
@@ -114,7 +187,7 @@ const Applied = () => {
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Chip 
-                      label={drive.formattedDate} 
+                      label={`Applied: ${drive.formattedDate}`} 
                       size="small" 
                       icon={<EventIcon fontSize="small" />}
                     />
@@ -147,23 +220,37 @@ const Applied = () => {
 
                   <Divider sx={{ my: 2 }} />
 
-                  <Grid container spacing={1} sx={{ mt: 1 }}>
-                    <Grid item xs={6}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PeopleIcon fontSize="small" sx={{ mr: 1, color: orange[500] }} />
-                        <Typography variant="body2">
-                          {drive.driveNoOpenings} openings
-                        </Typography>
-                      </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong> start Date:</strong> {drive.createDate}
+                      </Typography>
                     </Grid>
-                    <Grid item xs={6}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <EventIcon fontSize="small" sx={{ mr: 1, color: teal[500] }} />
-                        <Typography variant="body2">
-                          {drive.driveLastDate || 'N/A'}
-                        </Typography>
-                      </Box>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Last Date to Apply:</strong> {drive.driveLastDate}
+                      </Typography>
                     </Grid>
+                    {/* <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Location:</strong> {drive.driveLocation || 'N/A'}
+                      </Typography>
+                    </Grid> */}
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Job Type:</strong> {drive.driveTitle || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Salary:</strong> {drive.driveSalary || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    {/* <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Skills:</strong> {drive.driveSkills?.join(', ') || 'N/A'}
+                      </Typography>
+                    </Grid> */}
                   </Grid>
                 </CardContent>
 
@@ -192,4 +279,4 @@ const Applied = () => {
   );
 };
 
-export default Applied;
+export default Applied;

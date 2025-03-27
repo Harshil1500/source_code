@@ -25,6 +25,7 @@ import { auth } from "../../firebase";
 import { motion } from "framer-motion";
 //import {photos} from "./pic1.jpg";
 
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -333,24 +334,23 @@ const Login = () => {
                 //  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)'
                 }}
               >
-                <Box
-                        component="img"
-                        src="/images/pic1.png"
-                       
-                        alt="Campus Connect"
-                        xl={{
-                          width: '100%',
-                          height: '100vh',
-                          objectFit: 'cover',
-                          borderRadius: '15px',
-                          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.2)',
-                          display: { xs: 'none', md: 'block' }
-                        }}
-                      />
+              <Box
+              component="img"
+              src="/images/pic1.png"
+              alt="Campus Connect"
+              sx={{
+                maxWidth: '100%', // Image stretch na thay
+                height: 'auto', // Aspect ratio maintain
+                borderRadius: '15px',
+                boxShadow: '0 8px 40px rgba(0, 0, 0, 0.2)',
+                display: { xs: 'none', md: 'block' }
+              }}
+            />
+
 
               </Box>
               
-              <Typography variant="h4" fontWeight="bold" color="#3f51b5" gutterBottom>
+              <Typography variant="h4"  fontWeight="bold" color="#3f51b5" gutterBottom >
                 Welcome to Campus Connect
               </Typography>
               <Typography variant="body1" color="#555" textAlign="center">
@@ -361,7 +361,7 @@ const Login = () => {
           </Grid>
         </Grid>
       </Container>
-      <ToastContainer position="top-right" autoClose={3000} limit={3} theme="colored" />
+      <ToastContainer position="top-right" autoClose={3000} limit={3} theme="colored"  />
     </Box>
   );
 };
