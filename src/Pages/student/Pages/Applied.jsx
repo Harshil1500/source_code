@@ -11,7 +11,6 @@ import {
   LinearProgress,
   Alert,
   Divider,
-  IconButton,
   Tooltip
 } from "@mui/material";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -20,11 +19,11 @@ import { db } from "../../../firebase";
 import { getAuth } from "firebase/auth";
 import WorkIcon from '@mui/icons-material/Work';
 import EventIcon from '@mui/icons-material/Event';
-import PeopleIcon from '@mui/icons-material/People';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DownloadIcon from '@mui/icons-material/Download';
-import { teal, blue, orange, green } from '@mui/material/colors';
-import * as XLSX from 'xlsx';
+import { blue, green } from '@mui/material/colors';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const Applied = () => {
   const auth = getAuth();
@@ -33,20 +32,15 @@ const Applied = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Helper function to format dates safely
   const formatDate = (date) => {
     if (!date) return 'N/A';
-    
     try {
-      // Handle Firebase Timestamp
       if (date.seconds) {
         return new Date(date.seconds * 1000).toLocaleDateString();
       }
-      // Handle string dates
       if (typeof date === 'string') {
         return new Date(date).toLocaleDateString();
       }
-      // Handle Date objects
       if (date instanceof Date) {
         return date.toLocaleDateString();
       }
@@ -94,24 +88,40 @@ const Applied = () => {
   };
 
   const downloadReport = () => {
-    const reportData = filteredDrives.map(drive => ({
-      'Drive Title': drive.driveTitle || 'N/A',
-      'Company Name': drive.driveCompanyName || 'N/A',
-      'Application Date': drive.formattedDate,
-      'Start Date': drive.createDate,
-      'Last Date': drive.driveLastDate,
-      'Open Positions': drive.driveNoOpenings || 'N/A',
-     // 'Job Location': drive.driveLocation || 'N/A',
-      'Job Type': drive.driveTitle|| 'N/A',
-      'Salary Package': drive.driveSalary || 'N/A',
-    //  'Skills Required': drive.driveSkills?.join(', ') || 'N/A',
-      'Status': 'Applied'
-    }));
+    const doc = new jsPDF();
 
-    const ws = XLSX.utils.json_to_sheet(reportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Applied Drives");
-    XLSX.writeFile(wb, `Applied_Drives_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    doc.setFontSize(18);
+    doc.text('Applied Job Drives Report', 14, 22);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+
+    const headers = [
+      ['Title', 'Company', 'Applied Date', 'Start Date', 'Last Date', 'Openings', 'Job Type', 'Salary', 'Status']
+    ];
+
+    const data = filteredDrives.map(drive => ([
+      drive.driveTitle || 'N/A',
+      drive.driveCompanyName || 'N/A',
+      drive.formattedDate,
+      drive.createDate || 'N/A',
+      drive.driveLastDate || 'N/A',
+      drive.driveNoOpenings || 'N/A',
+      drive.driveTitle || 'N/A',
+      drive.driveSalary || 'N/A',
+      'Applied'
+    ]));
+
+    doc.autoTable({
+      head: headers,
+      body: data,
+      startY: 35,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`Applied_Drives_Report_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   useEffect(() => {
@@ -141,7 +151,7 @@ const Applied = () => {
         </Typography>
         
         {filteredDrives.length > 0 && (
-          <Tooltip title="Download Report">
+          <Tooltip title="Download PDF Report">
             <Button 
               variant="contained"
               onClick={downloadReport}
@@ -154,7 +164,7 @@ const Applied = () => {
                 }
               }}
             >
-              Download Report
+              Download PDF
             </Button>
           </Tooltip>
         )}
@@ -223,7 +233,7 @@ const Applied = () => {
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong> start Date:</strong> {drive.createDate}
+                        <strong>Start Date:</strong> {drive.createDate}
                       </Typography>
                     </Grid>
                     <Grid item xs={12}>
@@ -231,11 +241,6 @@ const Applied = () => {
                         <strong>Last Date to Apply:</strong> {drive.driveLastDate}
                       </Typography>
                     </Grid>
-                    {/* <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Location:</strong> {drive.driveLocation || 'N/A'}
-                      </Typography>
-                    </Grid> */}
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Job Type:</strong> {drive.driveTitle || 'N/A'}
@@ -246,11 +251,6 @@ const Applied = () => {
                         <strong>Salary:</strong> {drive.driveSalary || 'N/A'}
                       </Typography>
                     </Grid>
-                    {/* <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Skills:</strong> {drive.driveSkills?.join(', ') || 'N/A'}
-                      </Typography>
-                    </Grid> */}
                   </Grid>
                 </CardContent>
 
