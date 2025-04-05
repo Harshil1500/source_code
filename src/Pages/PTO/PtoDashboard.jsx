@@ -13,7 +13,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Toolbar
+  Toolbar,
+  Avatar
 } from '@mui/material';
 import MuiDrawer from '@mui/material/Drawer';
 import MuiAppBar from '@mui/material/AppBar';
@@ -32,7 +33,7 @@ import { db } from '../../firebase';
 
 // Components
 import ManageDrives from '../CommonPages/ManageDrives';
-import StudentList from '../CommonPages/Students';
+import StudentsNew from '../CommonPages/StudentsNew';
 import Info from './Pages/Info';
 
 const drawerWidth = 240;
@@ -151,7 +152,7 @@ export default function PtoDashboard() {
     { 
       name: 'Students', 
       icon: <PeopleAltOutlinedIcon />,
-      component: 'StudentList'
+      component: 'Students'
     },
     { 
       name: 'Profile', 
@@ -163,7 +164,7 @@ export default function PtoDashboard() {
   const renderComponent = () => {
     switch(activeComponent) {
       case 'ManageDrives': return <ManageDrives />;
-      case 'StudentList': return <StudentList />;
+      case 'Students': return <StudentsNew />;
       case 'Info': return <Info user={user} />;
       default: return <ManageDrives />;
     }
@@ -198,11 +199,16 @@ export default function PtoDashboard() {
             <Typography variant="h6" noWrap component="div">
               Placement Training Office
             </Typography>
-            <Tooltip title="Logout">
-              <IconButton onClick={signOut} color="inherit">
-                <PowerSettingsNewIcon />
-              </IconButton>
-            </Tooltip>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="subtitle1">
+                {user.FullName || 'PTO Officer'}
+              </Typography>
+              <Tooltip title="Logout">
+                <IconButton onClick={signOut} color="inherit">
+                  <PowerSettingsNewIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>

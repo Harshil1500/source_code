@@ -351,12 +351,12 @@ const Login = () => {
               </Box>
               
               <Typography variant="h4"  fontWeight="bold" color="#3f51b5" gutterBottom >
-                Welcome to Campus Connect
+                Welcome to Placement Protal
               </Typography>
-              <Typography variant="body1" color="#555" textAlign="center">
+              {/* <Typography variant="body1" color="#555" textAlign="center">
                 Join our platform to access course materials, connect with professors, 
                 and collaborate with fellow students. Your academic journey starts here!
-              </Typography>
+              </Typography> */}
             </motion.div>
           </Grid>
         </Grid>

@@ -1,164 +1,3 @@
-// import React, { useEffect, useState } from 'react';
-// import { styled } from '@mui/material/styles';
-// import Table from '@mui/material/Table';
-// import TableBody from '@mui/material/TableBody';
-// import TableCell, { tableCellClasses } from '@mui/material/TableCell';
-// import TableContainer from '@mui/material/TableContainer';
-// import TableHead from '@mui/material/TableHead';
-// import TableRow from '@mui/material/TableRow';
-// import Paper from '@mui/material/Paper';
-// import { Box, Switch, IconButton, Tooltip } from '@mui/material';
-// import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
-// import { db } from '../../firebase';
-// import VisibilityIcon from '@mui/icons-material/Visibility';
-
-// const StyledTableCell = styled(TableCell)(({ theme }) => ({
-//   [`&.${tableCellClasses.head}`]: {
-//     backgroundColor: theme.palette.primary.main,
-//     color: theme.palette.common.white,
-//     fontWeight: 'bold',
-//   },
-//   [`&.${tableCellClasses.body}`]: {
-//     fontSize: 14,
-//   },
-// }));
-
-// const StyledTableRow = styled(TableRow)(({ theme }) => ({
-//   '&:nth-of-type(odd)': {
-//     backgroundColor: theme.palette.action.hover,
-//   },
-//   '&:last-child td, &:last-child th': {
-//     border: 0,
-//   },
-// }));
-
-// const Students = () => {
-//   const [students, setStudents] = useState([]);
-//   const [loading, setLoading] = useState(true);
-  
-//   const fetchStudents = async () => {
-//     try {
-//       const querySnapshot = await getDocs(collection(db, "users"));
-//       const studentList = [];
-      
-//       querySnapshot.forEach((doc) => {
-//         const data = doc.data();
-//         if (data.userType === 'student') {
-//           studentList.push({ 
-//             id: doc.id, 
-//             ...data,
-//             erNo: data.erNo || doc.id // Use erNo if available, otherwise use document ID
-//           });
-//         }
-//       });
-      
-//       setStudents(studentList);
-//       setLoading(false);
-//     } catch (error) {
-//       console.error("Error fetching students:", error);
-//       setLoading(false);
-//     }
-//   };
-
-//   useEffect(() => {
-//     fetchStudents();
-//   }, []);
-
-//   const handleStatusChange = async (event, studentId) => {
-//     const isEnabled = event.target.checked;
-    
-//     try {
-//       const studentRef = doc(db, "users", studentId);
-//       await updateDoc(studentRef, {
-//         isEnable: isEnabled
-//       });
-      
-//       setStudents(prevStudents => 
-//         prevStudents.map(student => 
-//           student.id === studentId 
-//             ? { ...student, isEnable: isEnabled } 
-//             : student
-//         )
-//       );
-//     } catch (error) {
-//       console.error("Error updating student status:", error);
-//     }
-//   };
-
-//   const handleViewProfile = (studentId) => {
-//     // Implement your profile viewing logic here
-//     console.log("View profile for student:", studentId);
-//     // You can navigate to a profile page or show a modal
-//     // Example: navigate(`/student-profile/${studentId}`);
-//   };
-
-//   if (loading) {
-//     return (
-//       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-//         Loading students...
-//       </Box>
-//     );
-//   }
-
-//   return (
-//     <Box sx={{ padding: 2 }}>
-//       <h1>Students</h1>
-//       <TableContainer component={Paper} elevation={3}>
-//         <Table sx={{ minWidth: 650 }} aria-label="students table">
-//           <TableHead>
-//             <StyledTableRow>
-//               <StyledTableCell>Enrollment No</StyledTableCell>
-//               <StyledTableCell>First Name</StyledTableCell>
-//               <StyledTableCell>Last Name</StyledTableCell>
-//               <StyledTableCell>Email</StyledTableCell>
-//               <StyledTableCell align="center">Status</StyledTableCell>
-//               <StyledTableCell align="center">View Profile</StyledTableCell>
-//             </StyledTableRow>
-//           </TableHead>
-          
-//           <TableBody>
-//             {students.length > 0 ? (
-//               students.map((student) => (
-//                 <StyledTableRow key={student.id}>
-//                   <StyledTableCell>{student.erNo}</StyledTableCell>
-//                   <StyledTableCell>{student.firstName}</StyledTableCell>
-//                   <StyledTableCell>{student.lastName}</StyledTableCell>
-//                   <StyledTableCell>{student.email}</StyledTableCell>
-//                   <StyledTableCell align="center">
-//                     <Switch 
-//                       checked={student.isEnable || false}
-//                       onChange={(e) => handleStatusChange(e, student.id)}
-//                       color="primary"
-//                     />
-//                   </StyledTableCell>
-//                   <StyledTableCell align="center">
-//                     <Tooltip title="View Profile">
-//                       <IconButton 
-//                         onClick={() => handleViewProfile(student.id)}
-//                         color="primary"
-//                       >
-//                         <VisibilityIcon />
-//                       </IconButton>
-//                     </Tooltip>
-//                   </StyledTableCell>
-//                 </StyledTableRow>
-//               ))
-//             ) : (
-//               <StyledTableRow>
-//                 <StyledTableCell colSpan={6} align="center">
-//                   No students found
-//                 </StyledTableCell>
-//               </StyledTableRow>
-//             )}
-//           </TableBody>
-//         </Table>
-//       </TableContainer>
-//     </Box>
-//   );
-// }
-
-// export default Students;
-
 import React, { useEffect, useState } from "react";
 import { 
   Box, 
@@ -170,10 +9,11 @@ import {
   styled
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import * as XLSX from "xlsx";
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, updateDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import DownloadIcon from '@mui/icons-material/Download';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 // Styled components for consistent UI
 const StyledButton = styled(Button)(({ theme }) => ({
@@ -236,24 +76,44 @@ const StudentsNew = () => {
     }
   };
 
-  // Export student applications to Excel
+  // Export student applications to PDF
   const exportStudentsReport = async () => {
     try {
       setExportLoading(true);
-      const applicationsSnapshot = await getDocs(collection(db, "applications"));
-      const studentList = applicationsSnapshot.docs.map((doc) => {
+      
+      // First get all student users to map erNo to names
+      const usersQuery = query(collection(db, "users"), where("userType", "==", "student"));
+      const usersSnapshot = await getDocs(usersQuery);
+      const studentsMap = {};
+      
+      usersSnapshot.forEach((doc) => {
         const data = doc.data();
-        return {
-          "Enrollment No": data.erNo ?? "N/A",
-          "First Name": data.firstName ?? "N/A",
-          "Last Name": data.lastName ?? "N/A",
-          "Email": data.email ?? "N/A",
-          "Applied Drive": data.driveTitle ?? "N/A",
-          "Company": data.companyName ?? "N/A",
-          "Applied Date": data.appliedDate
+        studentsMap[data.erNo] = {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email
+        };
+      });
+
+      // Then get all applications
+      const applicationsSnapshot = await getDocs(collection(db, "applications"));
+      const studentList = [];
+      
+      applicationsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const studentInfo = studentsMap[data.erNo] || {};
+        
+        studentList.push({
+          erNo: data.erNo || "N/A",
+          name: `${studentInfo.firstName || "N/A"} ${studentInfo.lastName || ""}`,
+          email: studentInfo.email || "N/A",
+          drive: data.driveTitle || "N/A",
+          company: data.companyName || "N/A",
+          date: data.appliedDate
             ? new Date(data.appliedDate.seconds * 1000).toLocaleDateString()
             : "N/A",
-        };
+          status: data.status || "N/A"
+        });
       });
 
       if (studentList.length === 0) {
@@ -261,10 +121,62 @@ const StudentsNew = () => {
         return;
       }
 
-      const ws = XLSX.utils.json_to_sheet(studentList);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Student Applications");
-      XLSX.writeFile(wb, `Student_Applications_${new Date().toISOString().split('T')[0]}.xlsx`);
+      // Create PDF document
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.setTextColor(40);
+      doc.text("Student Applications Report", 14, 22);
+      
+      // Add date
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+      
+      // Add table
+      doc.autoTable({
+        startY: 35,
+        head: [
+          ["Enrollment No", "Student Name", "Email", "Drive", "Company", "Applied Date", "Status"]
+        ],
+        body: studentList.map(item => [
+          item.erNo,
+          item.name,
+          item.email,
+          item.drive,
+          item.company,
+          item.date,
+          item.status
+        ]),
+        theme: 'grid',
+        headStyles: {
+          fillColor: [63, 81, 181], // Material UI primary color
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        styles: {
+          cellPadding: 3,
+          fontSize: 9,
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 20 }
+        },
+        margin: { left: 14 }
+      });
+
+      // Save the PDF
+      doc.save(`Student_Applications_${new Date().toISOString().split('T')[0]}.pdf`);
       
     } catch (error) {
       console.error("Error exporting report:", error);
@@ -351,10 +263,10 @@ const StudentsNew = () => {
         onClick={exportStudentsReport}
         disabled={exportLoading}
       >
-        {exportLoading ? 'Exporting...' : 'Export Student Applications'}
+        {exportLoading ? 'Exporting...' : 'Export Student Applications (PDF)'}
       </StyledButton>
     </Box>
   );
-};
+}; 
 
 export default StudentsNew;
