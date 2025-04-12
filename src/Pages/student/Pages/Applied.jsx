@@ -1,9 +1,9 @@
-import { 
-  Button, 
-  Card, 
-  CardActions, 
-  CardContent, 
-  Grid, 
+import {
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  Grid,
   Typography,
   Box,
   Chip,
@@ -23,7 +23,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DownloadIcon from '@mui/icons-material/Download';
 import { blue, green } from '@mui/material/colors';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const Applied = () => {
   const auth = getAuth();
@@ -56,8 +56,8 @@ const Applied = () => {
       const querySnapshot = await getDocs(collection(db, "drives"));
       const driveList = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        return { 
-          id: doc.id, 
+        return {
+          id: doc.id,
           ...data,
           formattedDate: formatDate(data.createDate),
           formattedLastDate: formatDate(data.driveLastDate),
@@ -98,7 +98,7 @@ const Applied = () => {
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
 
     const headers = [
-      ['Title', 'Company', 'Applied Date', 'Start Date', 'Last Date', 'Openings', 'Job Type', 'Salary', 'Status']
+      ['Title', 'Company', 'Applied Date', 'createDate', 'Last Date', 'Salary', 'Status']
     ];
 
     const data = filteredDrives.map(drive => ([
@@ -106,14 +106,14 @@ const Applied = () => {
       drive.driveCompanyName || 'N/A',
       drive.formattedDate,
       drive.createDate || 'N/A',
-      drive.driveLastDate || 'N/A',
-      drive.driveNoOpenings || 'N/A',
-      drive.driveTitle || 'N/A',
+      drive.formattedLastDate || 'N/A',
+      //drive.driveNoOpenings || 'N/A',
+      //drive.driveType || 'N/A',
       drive.driveSalary || 'N/A',
       'Applied'
     ]));
 
-    doc.autoTable({
+    autoTable(doc, {
       head: headers,
       body: data,
       startY: 35,
@@ -149,14 +149,14 @@ const Applied = () => {
           <WorkIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
           My Applied Drives
         </Typography>
-        
+
         {filteredDrives.length > 0 && (
           <Tooltip title="Download PDF Report">
-            <Button 
+            <Button
               variant="contained"
               onClick={downloadReport}
               startIcon={<DownloadIcon />}
-              sx={{ 
+              sx={{
                 bgcolor: blue[500],
                 color: 'white',
                 '&:hover': {
@@ -184,9 +184,9 @@ const Applied = () => {
         <Grid container spacing={3}>
           {filteredDrives.map((drive) => (
             <Grid item xs={12} sm={6} md={4} key={drive.id}>
-              <Card sx={{ 
-                height: '100%', 
-                display: 'flex', 
+              <Card sx={{
+                height: '100%',
+                display: 'flex',
                 flexDirection: 'column',
                 transition: 'transform 0.2s',
                 '&:hover': {
@@ -196,14 +196,14 @@ const Applied = () => {
               }}>
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Chip 
-                      label={`Applied: ${drive.formattedDate}`} 
-                      size="small" 
+                    <Chip
+                      label={`Applied: ${drive.formattedDate}`}
+                      size="small"
                       icon={<EventIcon fontSize="small" />}
                     />
-                    <Chip 
-                      label="Applied" 
-                      color="success" 
+                    <Chip
+                      label="Applied"
+                      color="success"
                       size="small"
                       icon={<CheckCircleIcon fontSize="small" />}
                     />
@@ -214,12 +214,12 @@ const Applied = () => {
                   </Typography>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ 
-                      bgcolor: blue[100], 
-                      color: blue[800], 
-                      width: 24, 
-                      height: 24, 
-                      mr: 1 
+                    <Avatar sx={{
+                      bgcolor: blue[100],
+                      color: blue[800],
+                      width: 24,
+                      height: 24,
+                      mr: 1
                     }}>
                       <WorkIcon fontSize="small" />
                     </Avatar>
@@ -238,14 +238,14 @@ const Applied = () => {
                     </Grid>
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Last Date to Apply:</strong> {drive.driveLastDate}
+                        <strong>Last Date to Apply:</strong> {drive.formattedLastDate}
                       </Typography>
                     </Grid>
-                    <Grid item xs={12}>
+                    {/* <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Job Type:</strong> {drive.driveTitle || 'N/A'}
+                        <strong>Job Type:</strong> {drive.driveType || 'N/A'}
                       </Typography>
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Salary:</strong> {drive.driveSalary || 'N/A'}

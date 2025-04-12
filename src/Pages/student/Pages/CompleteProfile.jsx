@@ -43,7 +43,7 @@ const CompleteProfile = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [formData, setFormData] = useState({
-    enrollmentNumber: "",
+    erNo: "",
     firstName: "",
     lastName: "",
     dob: "",
@@ -200,7 +200,7 @@ const CompleteProfile = () => {
           doc(db, "users", uid),
           {
             ...formData,
-            enrollmentNumber: formData.enrollmentNumber || "",
+            erNo: formData.erNo || "",
             userType: "student",
             profileCompleted: true,
             timestamp: serverTimestamp(),
@@ -233,7 +233,7 @@ const CompleteProfile = () => {
             ...prevData,
             firstName: userData.firstName || "",
             lastName: userData.lastName || "",
-            enrollmentNumber: userData.enrollmentNumber || "",
+            erNo: userData.erNo || "",
             email: userData.email || "",
           }));
         }
@@ -304,13 +304,13 @@ const CompleteProfile = () => {
                     <Grid container spacing={3}>
                       <Grid item xs={12} sm={6}>
                         <TextField
-                          name="enrollmentNumber"
+                          name="erNo"
                           label="Enrollment Number"
                           fullWidth
-                          value={formData.enrollmentNumber}
+                          value={formData.erNo}
                           onChange={handleInputChange}
-                          error={!!errors.enrollmentNumber}
-                          helperText={errors.enrollmentNumber}
+                          error={!!errors.erNo}
+                          helperText={errors.erNo}
                           disabled
                           sx={{ mb: 2 }}
                         />

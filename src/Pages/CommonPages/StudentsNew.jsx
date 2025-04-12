@@ -16,8 +16,14 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DownloadIcon from "@mui/icons-material/Download";
-import * as XLSX from "xlsx";
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import {
+  collection,
+  doc,
+  getDocs,
+  updateDoc
+} from "firebase/firestore";
 import { db } from "../../firebase";
 
 const StyledButton = styled(Button)(({ theme }) => ({
@@ -90,6 +96,83 @@ const StudentsNew = () => {
     setSelectedStudent(null);
   };
 
+  const exportToPDF = async () => {
+    try {
+      setExportLoading(true);
+
+      // Fetch applications from Firestore
+      const applicationsSnapshot = await getDocs(collection(db, "applications"));
+      const applications = applicationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      if (applications.length === 0) {
+        alert("No student applications found.");
+        return;
+      }
+
+      // Create a new PDF
+      const pdfDoc = new jsPDF();
+      pdfDoc.setFontSize(18);
+      pdfDoc.setTextColor(40);
+      pdfDoc.text("Student Applications Report", 14, 22);
+
+      pdfDoc.setFontSize(11);
+      pdfDoc.setTextColor(100);
+      pdfDoc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+
+      // Format data
+      const tableData = applications.map(app => [
+        app.erNo || "N/A",
+        `${app.firstName || "N/A"} ${app.lastName || ""}`,
+        app.email || "N/A",
+        app.driveTitle || "N/A",
+        app.companyName || "N/A",
+        app.appliedDate && app.appliedDate.seconds
+          ? new Date(app.appliedDate.seconds * 1000).toLocaleDateString()
+          : "N/A",
+        app.status || "N/A"
+      ]);
+
+      // Generate table
+      pdfDoc.autoTable({
+        startY: 35,
+        head: [["Enrollment No", "Student Name", "Email", "Drive", "Company", "Applied Date", "Status"]],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [63, 81, 181],
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        styles: {
+          cellPadding: 3,
+          fontSize: 9,
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 }
+        }
+      });
+
+      // Save PDF
+      pdfDoc.save(`Student_Applications_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const columns = [
     {
       field: "profile",
@@ -144,10 +227,10 @@ const StudentsNew = () => {
       <StyledButton
         variant="contained"
         startIcon={<DownloadIcon />}
-        onClick={() => {}}
+        onClick={exportToPDF}
         disabled={exportLoading}
       >
-        {exportLoading ? "Exporting..." : "Export Student Applications"}
+        {exportLoading ? "Exporting..." : "Export Student Applications (PDF)"}
       </StyledButton>
       {selectedStudent && (
         <Dialog open={!!selectedStudent} onClose={handleCloseProfile}>
@@ -156,8 +239,8 @@ const StudentsNew = () => {
             <Typography><b>Name:</b> {selectedStudent.firstName} {selectedStudent.lastName}</Typography>
             <Typography><b>Email:</b> {selectedStudent.email}</Typography>
             <Typography><b>Enrollment No:</b> {selectedStudent.erNo}</Typography>
-            <Typography><b>collegeName:</b> {selectedStudent.collegeName}</Typography>
-            <Typography><b>course:</b> {selectedStudent.course}</Typography>
+            <Typography><b>College:</b> {selectedStudent.collegeName}</Typography>
+            <Typography><b>Course:</b> {selectedStudent.course}</Typography>
             <Typography><b>Mobile:</b> {selectedStudent.mobile}</Typography>
             <Typography><b>LinkedIn:</b> <a href={selectedStudent.linkedin} target="_blank" rel="noopener noreferrer">Profile</a></Typography>
           </DialogContent>
@@ -169,4 +252,5 @@ const StudentsNew = () => {
     </Box>
   );
 };
+
 export default StudentsNew;

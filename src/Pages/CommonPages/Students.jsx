@@ -116,6 +116,7 @@ const StudentsNew = () => {
         });
       });
 
+      // Check if the studentList is empty
       if (studentList.length === 0) {
         alert("No students have applied yet.");
         return;

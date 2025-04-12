@@ -508,12 +508,12 @@ import { PhotoSizeSelectLarge } from "@mui/icons-material";
                 
                 <Stack spacing={2} sx={{ mt: 4, textAlign: 'center', maxWidth: '80%' }}>
                   <Typography variant="h4" fontWeight="bold" color="#3f51b5">
-                    Welcome to Campus Connect
+                    Welcome to Placement Protal
                   </Typography>
-                  <Typography variant="body1" color="#555">
+                  {/* <Typography variant="body1" color="#555">
                     Join our platform to access course materials, connect with professors, 
                     and collaborate with fellow students. Your academic journey starts here!
-                  </Typography>
+                  </Typography> */}
                 </Stack>
               </motion.div>
             </Grid>
