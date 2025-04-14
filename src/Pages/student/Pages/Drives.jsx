@@ -185,7 +185,11 @@ const Drives = () => {
         driveTitle: drive.driveTitle,
         companyName: drive.driveCompanyName,
         appliedDate: serverTimestamp(),
+        status: "Applied",
+        createdAt: serverTimestamp(),
+        driveLastDate: drive.driveLastDate,
       });
+      
 
       setAppliedDrives([...appliedDrives, drive.id]);
       setAcademicDetails({ sscPercentage: '', hscPercentage: '' });
@@ -236,7 +240,7 @@ const Drives = () => {
                   <Typography variant="body2" paragraph>
                     <strong>Last Date:</strong> {drive.formattedLastDate || "N/A"}
                   </Typography>
-                  {drive.driveSscPerc && (
+                  {/* {drive.driveSscPerc && (
                     <Typography variant="body2">
                       <strong>SSC % Required:</strong> {drive.driveSscPerc}%
                     </Typography>
@@ -245,7 +249,7 @@ const Drives = () => {
                     <Typography variant="body2">
                       <strong>HSC % Required:</strong> {drive.driveHscPerc}%
                     </Typography>
-                  )}
+                  )} */}
                   {drive.driveNoOpenings && (
                     <Typography variant="body2">
                       <strong>Openings:</strong> {drive.driveNoOpenings}

@@ -22,6 +22,8 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import { styled } from '@mui/material/styles';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Icons
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
@@ -136,6 +138,51 @@ const ManageDrives = () => {
       return dateString;
     }
   };
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+  
+    doc.text("Drive Report", 14, 15);
+  
+    const tableColumn = [
+      "Title",
+      "Company",
+      "Last Date",
+      "Salary",
+      "SSC",
+      "HSC",
+      "Bachelor",
+      "Bond",
+      "Bond Time",
+      "Interview Mode",
+    ];
+  
+    const tableRows = [];
+  
+    row.forEach((drive) => {
+      const driveData = [
+        drive.driveTitle || "N/A",
+        drive.driveCompanyName || "N/A",
+        drive.driveLastDate || "N/A",
+        drive.driveSalary || "N/A",
+        drive.driveSscPerc || "N/A",
+        drive.driveHscPerc || "N/A",
+        drive.driveBachelorPerc|| "N/A",
+        drive.driveBond|| "N/A",
+        drive.driveBondTime|| "N/A",
+        drive.driveInterviewMode || "N/A",
+      ];
+      tableRows.push(driveData);
+    });
+  
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+    });
+  
+    doc.save("Drive_Report.pdf");
+  };
+  
 
   // Handle input changes
   const handleInput = (e) => {
@@ -561,6 +608,14 @@ const ManageDrives = () => {
               <Typography variant="h5" sx={{ color: '#5c6bc0', fontWeight: 'bold' }}>
                 Current Drives
               </Typography>
+              <Button
+  variant="contained"
+  color="primary"
+  onClick={handleDownloadPDF}
+  style={{ marginBottom: "16px" }}
+>
+  Download PDF Report
+</Button>
               <Button 
                 variant="contained" 
                 startIcon={<AddIcon />}

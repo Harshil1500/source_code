@@ -27,12 +27,14 @@ import { collection, doc, getDocs, serverTimestamp, setDoc, deleteDoc } from 'fi
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// PDF libraries
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 const PtoManage = () => {
-  // Toast notifications
   const notifySuccess = (message) => toast.success(message);
   const notifyError = (message) => toast.error(message);
 
-  // State management
   const [errors, setErrors] = useState({
     password: false,
     email: false,
@@ -46,7 +48,6 @@ const PtoManage = () => {
     password: ''
   });
 
-  // Fetch users from Firestore
   const fetchUsers = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'));
@@ -61,24 +62,19 @@ const PtoManage = () => {
     }
   };
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [id]: value
     }));
-    // Reset errors when typing
     if (id === 'email') setErrors(prev => ({ ...prev, email: false }));
     if (id === 'password') setErrors(prev => ({ ...prev, password: false }));
     setErrors(prev => ({ ...prev, allFields: false }));
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Basic validation
     if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
       setErrors(prev => ({ ...prev, allFields: true }));
       notifyError("All fields are required");
@@ -86,14 +82,12 @@ const PtoManage = () => {
     }
 
     try {
-      // Create user in Firebase Auth
       const res = await createUserWithEmailAndPassword(
         auth, 
         formData.email, 
         formData.password
       );
-      
-      // Create user document in Firestore
+
       await setDoc(doc(db, 'users', res.user.uid), {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -102,7 +96,6 @@ const PtoManage = () => {
         timeStamp: serverTimestamp()
       });
 
-      // Reset form and fetch updated list
       setFormData({
         firstName: '',
         lastName: '',
@@ -128,7 +121,6 @@ const PtoManage = () => {
     }
   };
 
-  // Delete user
   const handleDeleteUser = async (userId) => {
     if (window.confirm("Are you sure you want to delete this user?")) {
       try {
@@ -140,6 +132,29 @@ const PtoManage = () => {
         notifyError("Failed to delete user");
       }
     }
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("PTO Users Report", 14, 22);
+
+    const filteredUsers = users.filter(user => user.userType === 'pto');
+
+    const tableData = filteredUsers.map((user, index) => [
+      index + 1,
+      user.firstName,
+      user.lastName,
+      user.email,
+    ]);
+
+    autoTable(doc, {
+      head: [["#", "First Name", "Last Name", "Email"]],
+      body: tableData,
+      startY: 30,
+    });
+
+    doc.save("PTO_Users_Report.pdf");
   };
 
   useEffect(() => {
@@ -231,6 +246,15 @@ const PtoManage = () => {
               PTO Users
             </Typography>
             <Divider sx={{ mb: 3 }} />
+
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={handleDownloadPDF}
+              sx={{ mb: 2 }}
+            >
+              Download PTO Report (PDF)
+            </Button>
             
             <TableContainer>
               <Table size="medium">
